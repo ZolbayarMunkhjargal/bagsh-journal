@@ -1,0 +1,21 @@
+# Normalise line endings in the repository so a checkout behaves the same
+# everywhere. Windows keeps CRLF in the working copy for the scripts and
+# documentation people open locally, while the committed content stays LF.
+
+* text=auto eol=lf
+
+# Windows batch and PowerShell files are edited on Windows and run there.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+
+# Anything binary must never be touched by the line-ending conversion.
+*.jar binary
+*.dll binary
+*.exe binary
+*.zip binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.db binary
+*.kjbackup binary

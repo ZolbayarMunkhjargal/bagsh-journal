@@ -1,0 +1,15 @@
+# Build, run and packaging output
+build/
+release/
+.tools/lib/
+.tools/deps.properties
+
+# Editors and OS noise
+.idea/
+.vscode/
+*.iml
+node_modules/
+*.log
+Thumbs.db
+desktop.ini
+.DS_Store
