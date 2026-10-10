@@ -1,6 +1,8 @@
 package app.kinderjournal.tools;
 
 import app.kinderjournal.db.AttendanceDao;
+import app.kinderjournal.i18n.Lang;
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.db.ChildDao;
 import app.kinderjournal.db.Db;
 import app.kinderjournal.db.GroupDao;
@@ -73,6 +75,7 @@ public final class SelfTest {
             testReferentialIntegrity(repo);
             testDeletionCascade(repo);
             testDatesAndText();
+            testTranslationCatalogues();
         }
 
         System.out.println();
@@ -678,6 +681,93 @@ public final class SelfTest {
                 0x00, 0x00, 0x00, 0x00, 'I', 'E', 'N', 'D', (byte) 0xAE,
                 0x42, 0x60, (byte) 0x82
         };
+    }
+
+    /**
+     * Checks the translation catalogues.
+     *
+     * <p>Every key the interface asks for must exist in English, because that is
+     * the fallback. A partially translated language is allowed - untranslated
+     * keys fall back to English rather than showing nothing - but the report says
+     * how complete each one is, so a regression is visible.
+     */
+    private static void testTranslationCatalogues() {
+        List<String> keys = Messages.keys();
+        check("catalogue has keys (" + keys.size() + ")", keys.size() > 500);
+
+        // English is the master list: no key may be missing from it.
+        List<String> englishGaps = Messages.missingFor(Lang.ENGLISH);
+        if (!englishGaps.isEmpty()) {
+            System.out.println("        missing from English: " + englishGaps);
+        }
+        check("English defines every key", englishGaps.isEmpty());
+
+        for (Lang lang : Lang.values()) {
+            List<String> missing = Messages.missingFor(lang);
+            int percent = (int) Math.round((keys.size() - missing.size()) * 100.0 / keys.size());
+            System.out.println("        " + lang.englishName() + ": " + percent + "% translated"
+                    + (missing.isEmpty() ? ""
+                    : ", " + missing.size() + " key(s) fall back to English"));
+        }
+
+        // Mongolian ships as a complete translation; below 95% a screen would be
+        // visibly half-English.
+        List<String> mongolianGaps = Messages.missingFor(Lang.MONGOLIAN);
+        check("Mongolian translation is at least 95% complete ("
+                        + (keys.size() - mongolianGaps.size()) + "/" + keys.size() + ")",
+                mongolianGaps.size() <= keys.size() * 5 / 100);
+        if (!mongolianGaps.isEmpty()) {
+            System.out.println("        still in English: " + mongolianGaps);
+        }
+
+        // Switching language must change the text that screens actually print.
+        Lang original = Messages.current();
+        try {
+            Messages.setCurrent(Lang.ENGLISH);
+            String englishToday = Dates.display(Dates.toIso(LocalDate.now()));
+            String englishCategory = Choices.ObservationCategory.LANGUAGE.label();
+            Messages.setCurrent(Lang.MONGOLIAN);
+            String mongolianToday = Dates.display(Dates.toIso(LocalDate.now()));
+            String mongolianCategory = Choices.ObservationCategory.LANGUAGE.label();
+            check("switching language changes date text", !englishToday.equals(mongolianToday));
+            check("switching language changes choice labels",
+                    !englishCategory.equals(mongolianCategory));
+            check("Mongolian date starts with the year", mongolianToday.startsWith("20"));
+            check("Mongolian label is in Cyrillic",
+                    mongolianCategory.matches(".*[\\u0400-\\u04FF].*"));
+            check("Mongolian attendance short code translated",
+                    !"P".equals(Choices.AttendanceStatus.PRESENT.shortCode()));
+        } finally {
+            Messages.setCurrent(original);
+        }
+
+        // A placeholder missing from a translation would print a stray "{0}".
+        int placeholderMismatches = 0;
+        for (String key : keys) {
+            if (!Messages.has(Lang.MONGOLIAN, key)) {
+                continue;
+            }
+            if (countPlaceholders(Messages.in(Lang.ENGLISH, key))
+                    != countPlaceholders(Messages.in(Lang.MONGOLIAN, key))) {
+                placeholderMismatches++;
+                if (placeholderMismatches <= 5) {
+                    System.out.println("        placeholder mismatch: " + key);
+                }
+            }
+        }
+        check("translations keep their placeholders (" + placeholderMismatches + " mismatched)",
+                placeholderMismatches == 0);
+    }
+
+    /** How many distinct {n} placeholders a message contains. */
+    private static int countPlaceholders(String message) {
+        java.util.Set<String> found = new java.util.TreeSet<>();
+        java.util.regex.Matcher matcher =
+                java.util.regex.Pattern.compile("\\{(\\d+)\\}").matcher(message);
+        while (matcher.find()) {
+            found.add(matcher.group(1));
+        }
+        return found.size();
     }
 
     private static void check(String name, boolean condition) {

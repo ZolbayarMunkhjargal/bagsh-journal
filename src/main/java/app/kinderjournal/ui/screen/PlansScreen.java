@@ -1,5 +1,6 @@
 package app.kinderjournal.ui.screen;
 
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.Choices;
 import app.kinderjournal.model.Group;
 import app.kinderjournal.model.LessonPlan;
@@ -39,10 +40,8 @@ import javafx.util.StringConverter;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -75,12 +74,12 @@ public final class PlansScreen implements Refreshable {
 
     @Override
     public String title() {
-        return "Lesson plans";
+        return Messages.get("plans.title");
     }
 
     @Override
     public String subtitle() {
-        return "Plan activities for a day or a whole week, then record what actually happened.";
+        return Messages.get("plans.subtitle");
     }
 
     @Override
@@ -102,9 +101,10 @@ public final class PlansScreen implements Refreshable {
         page.getChildren().add(buildToolbar());
 
         if (context.currentGroup() == null) {
-            page.getChildren().add(Ui.emptyState("No class selected",
-                    "Activities are planned for a class. Create one to get started.",
-                    Ui.primaryButton("Go to classes", () -> shell.show("classes"))));
+            page.getChildren().add(Ui.emptyState(Messages.get("plans.noClass.title"),
+                    Messages.get("plans.noClass.body"),
+                    Ui.primaryButton(Messages.get("plans.noClass.action"),
+                            () -> shell.show("classes"))));
             root.setContent(page);
             return;
         }
@@ -132,25 +132,26 @@ public final class PlansScreen implements Refreshable {
         HBox modes = new HBox();
         modes.getStyleClass().add("segmented");
         modes.getChildren().addAll(
-                modeButton("Day", View.DAY, modeGroup),
-                modeButton("Week", View.WEEK, modeGroup),
-                modeButton("Month", View.CALENDAR, modeGroup));
+                modeButton(Messages.get("plans.view.day"), View.DAY, modeGroup),
+                modeButton(Messages.get("plans.view.week"), View.WEEK, modeGroup),
+                modeButton(Messages.get("plans.view.month"), View.CALENDAR, modeGroup));
 
-        line.getChildren().addAll(Ui.fieldLabel("Class"), selector, modes, Ui.spacer());
+        line.getChildren().addAll(Ui.fieldLabel(Messages.get("common.class")), selector, modes,
+                Ui.spacer());
         line.getChildren().addAll(
                 Ui.button("\u2039", this::previousPeriod),
-                Ui.button("Today", () -> {
+                Ui.button(Messages.get("calendar.today"), () -> {
                     date = LocalDate.now();
                     context.setSelectedDate(date);
                     refresh();
                 }),
                 Ui.button("\u203a", this::nextPeriod),
-                Ui.primaryButton("Plan an activity", () -> openForm(null, date)));
+                Ui.primaryButton(Messages.get("plans.planActivity"), () -> openForm(null, date)));
         box.getChildren().add(line);
 
         HBox extras = new HBox(12);
         extras.setAlignment(Pos.CENTER_LEFT);
-        CheckBox allGroups = new CheckBox("Show plans for every class");
+        CheckBox allGroups = new CheckBox(Messages.get("plans.showAllClasses"));
         allGroups.setSelected(showAllGroups);
         allGroups.selectedProperty().addListener((observable, previous, next) -> {
             showAllGroups = next;
@@ -159,8 +160,8 @@ public final class PlansScreen implements Refreshable {
         extras.getChildren().addAll(
                 allGroups,
                 Ui.spacer(),
-                Ui.button("Print weekly plan", this::printWeek),
-                Ui.button("Print daily plan", this::printDay));
+                Ui.button(Messages.get("plans.printWeekly"), this::printWeek),
+                Ui.button(Messages.get("plans.printDaily"), this::printDay));
         box.getChildren().add(extras);
         return box;
     }
@@ -217,16 +218,17 @@ public final class PlansScreen implements Refreshable {
         banner.setAlignment(Pos.CENTER_LEFT);
         Label heading = new Label(Dates.displayLong(Dates.toIso(date)));
         heading.getStyleClass().add("section-title");
-        banner.getChildren().addAll(heading, Ui.spacer(),
-                Ui.meta(plans.isEmpty() ? "nothing planned"
-                        : Text.plural(plans.size(), "activity", "activities")));
+        String planned = plans.isEmpty() ? Messages.get("plans.nothingPlanned")
+                : Messages.get(plans.size() == 1 ? "count.activity" : "count.activities",
+                        plans.size());
+        banner.getChildren().addAll(heading, Ui.spacer(), Ui.meta(planned));
         box.getChildren().add(banner);
 
         if (plans.isEmpty()) {
-            box.getChildren().add(Ui.emptyState("Nothing planned for this day",
-                    "Add an activity with its objectives and materials, and it will also appear on "
-                            + "the weekly plan you can print for the classroom.",
-                    Ui.primaryButton("Plan an activity", () -> openForm(null, date))));
+            Node action = Ui.primaryButton(Messages.get("plans.planActivity"),
+                    () -> openForm(null, date));
+            box.getChildren().add(Ui.emptyState(Messages.get("plans.empty.title"),
+                    Messages.get("plans.empty.body"), action));
             return box;
         }
 
@@ -254,18 +256,19 @@ public final class PlansScreen implements Refreshable {
             head.getChildren().add(Ui.pill(plan.dateRangeLabel(), "pill-planned"));
         }
         if (plan.isTemplate()) {
-            head.getChildren().add(Ui.pill("template", "pill-count"));
+            head.getChildren().add(Ui.pill(Messages.get("plans.template"), "pill-count"));
         }
         head.getChildren().add(Ui.spacer());
         head.getChildren().addAll(
-                Ui.button("Edit", () -> openForm(plan, date)),
-                Ui.button("Copy to\u2026", () -> copyPlan(plan)),
-                Ui.button("Save as template", () -> saveAsTemplate(plan)),
-                Ui.dangerButton("Delete", () -> delete(plan)));
+                Ui.button(Messages.get("common.edit"), () -> openForm(plan, date)),
+                Ui.button(Messages.get("plans.copy.button"), () -> copyPlan(plan)),
+                Ui.button(Messages.get("plans.saveAsTemplate"), () -> saveAsTemplate(plan)),
+                Ui.dangerButton(Messages.get("common.delete"), () -> delete(plan)));
         card.getChildren().add(head);
 
         Label meta = new Label(Text.joinNonBlank(" \u00b7 ",
-                plan.getGroupName().isEmpty() ? "all classes" : plan.getGroupName(),
+                plan.getGroupName().isEmpty()
+                        ? Messages.get("plans.allClasses") : plan.getGroupName(),
                 plan.timeLabel(),
                 plan.isRange() ? "" : ""));
         meta.getStyleClass().add("meta");
@@ -273,28 +276,34 @@ public final class PlansScreen implements Refreshable {
 
         if (showDetail) {
             if (!Text.isBlank(plan.getObjectives())) {
-                card.getChildren().add(detailRow("Learning objectives", plan.getObjectives()));
+                card.getChildren().add(detailRow(Messages.get("plans.section.objectives"),
+                        plan.getObjectives()));
             }
             if (!Text.isBlank(plan.getDescription())) {
-                card.getChildren().add(detailRow("Planned activities", plan.getDescription()));
+                card.getChildren().add(detailRow(Messages.get("plans.section.activities"),
+                        plan.getDescription()));
             }
             if (!Text.isBlank(plan.getSequence())) {
-                card.getChildren().add(detailRow("Sequence", plan.getSequence()));
+                card.getChildren().add(detailRow(Messages.get("plans.section.sequence"),
+                        plan.getSequence()));
             }
             if (!Text.isBlank(plan.getMaterials())) {
-                card.getChildren().add(detailRow("Materials needed", plan.getMaterials()));
+                card.getChildren().add(detailRow(Messages.get("plans.section.materials"),
+                        plan.getMaterials()));
             }
             if (!Text.isBlank(plan.getInstructions())) {
-                card.getChildren().add(detailRow("Notes for the teacher", plan.getInstructions()));
+                card.getChildren().add(detailRow(Messages.get("plans.section.instructions"),
+                        plan.getInstructions()));
             }
             if (!Text.isBlank(plan.getReflection())) {
-                card.getChildren().add(detailRow("Reflection after the activity", plan.getReflection()));
+                card.getChildren().add(detailRow(Messages.get("plans.section.reflection"),
+                        plan.getReflection()));
             }
         }
 
         HBox statusRow = new HBox(8);
         statusRow.setAlignment(Pos.CENTER_LEFT);
-        statusRow.getChildren().add(Ui.fieldLabel("After the activity:"));
+        statusRow.getChildren().add(Ui.fieldLabel(Messages.get("plans.afterActivity")));
         for (Choices.PlanStatus status : Choices.PlanStatus.values()) {
             statusRow.getChildren().add(Ui.button(status.label(),
                     () -> setStatus(plan, status)));
@@ -333,19 +342,18 @@ public final class PlansScreen implements Refreshable {
     }
 
     private void askReflection(LessonPlan plan) {
-        Stage dialog = modalStage("How did it go?");
+        Stage dialog = modalStage(Messages.get("plans.reflection.title"));
         TextArea reflection = Ui.textArea(plan.getReflection(), 5);
-        reflection.setPromptText("Optional: what worked, what to change next time, "
-                + "how the children responded");
+        reflection.setPromptText(Messages.get("plans.reflection.hint"));
         VBox body = new VBox(10,
-                Ui.meta("Marking \"" + plan.getTitle() + "\" as completed."),
-                Ui.field("Reflection", reflection));
+                Ui.meta(Messages.get("plans.reflection.marking", plan.getTitle())),
+                Ui.field(Messages.get("plans.reflection.label"), reflection));
         body.setPadding(new Insets(16, 18, 16, 18));
         body.setPrefWidth(520);
 
         HBox buttons = new HBox(8, Ui.spacer(),
-                Ui.button("Cancel", dialog::close),
-                Ui.primaryButton("Mark completed", () -> {
+                Ui.button(Messages.get("common.cancel"), dialog::close),
+                Ui.primaryButton(Messages.get("plans.reflection.action"), () -> {
                     context.repo().plans().setStatusAndReflection(plan.getId(),
                             Choices.PlanStatus.COMPLETED.id(), reflection.getText().trim());
                     context.notifyDataChanged();
@@ -382,13 +390,13 @@ public final class PlansScreen implements Refreshable {
 
             HBox header = new HBox(6);
             header.setAlignment(Pos.CENTER_LEFT);
-            Label name = new Label(day.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.ENGLISH));
+            Label name = new Label(Dates.weekdayShort(day));
             name.getStyleClass().add("field-label");
             Label number = new Label(Dates.display(Dates.toIso(day)));
             number.getStyleClass().add(today ? "row-title" : "row-subtitle");
             header.getChildren().addAll(name, number);
             if (today) {
-                header.getChildren().add(Ui.pill("today", "pill-completed"));
+                header.getChildren().add(Ui.pill(Messages.get("plans.today"), "pill-completed"));
             }
             columnBox.getChildren().add(header);
 
@@ -410,11 +418,11 @@ public final class PlansScreen implements Refreshable {
         VBox box = new VBox(12);
         HBox heading = new HBox(10);
         heading.setAlignment(Pos.CENTER_LEFT);
-        Label title = new Label("Week of " + Dates.display(Dates.toIso(start)));
+        Label title = new Label(Messages.get("plans.weekOf", Dates.display(Dates.toIso(start))));
         title.getStyleClass().add("section-title");
         heading.getChildren().addAll(title, Ui.spacer(),
-                Ui.meta("Click a day to plan or edit that day"),
-                Ui.button("Plan an activity", () -> openForm(null, date)));
+                Ui.meta(Messages.get("plans.weekHint")),
+                Ui.button(Messages.get("plans.planActivity"), () -> openForm(null, date)));
         box.getChildren().add(heading);
         box.getChildren().add(grid);
         box.getChildren().add(legendRow());
@@ -429,8 +437,8 @@ public final class PlansScreen implements Refreshable {
             refresh();
         });
         columnBox.setCursor(javafx.scene.Cursor.HAND);
-        javafx.scene.control.Tooltip.install(columnBox,
-                new javafx.scene.control.Tooltip("Open " + Dates.display(Dates.toIso(day))));
+        javafx.scene.control.Tooltip.install(columnBox, new javafx.scene.control.Tooltip(
+                Messages.get("calendar.clickDay", Dates.display(Dates.toIso(day)))));
     }
 
     private Node weekChip(LessonPlan plan) {
@@ -491,7 +499,8 @@ public final class PlansScreen implements Refreshable {
             int shown = 0;
             for (LessonPlan plan : plans) {
                 if (shown++ >= 2) {
-                    CalendarMonth.addMarker(cell, "+" + (plans.size() - 2) + " more", null, "#546e7a");
+                    CalendarMonth.addMarker(cell, Messages.get("plans.moreActivities",
+                            plans.size() - 2), null, "#546e7a");
                     break;
                 }
                 CalendarMonth.addMarker(cell, plan.getTitle(), null, statusColour(plan));
@@ -504,11 +513,11 @@ public final class PlansScreen implements Refreshable {
             refresh();
         });
 
-        String monthName = month.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+        String monthName = Dates.monthName(month.getYear(), month.getMonthValue());
         VBox box = new VBox(12);
         box.getChildren().add(Ui.cardWithHeader(
-                "Activity plan \u00b7 " + monthName + " " + month.getYear(),
-                Ui.meta("Click a day to open it"),
+                Messages.get("plans.monthTitle", monthName),
+                Ui.meta(Messages.get("plans.monthHint")),
                 calendar.node()));
         box.getChildren().add(legendRow());
         return box;
@@ -520,8 +529,7 @@ public final class PlansScreen implements Refreshable {
         List<LessonPlan> templates = context.repo().plans().listTemplates();
         VBox list = new VBox(6);
         if (templates.isEmpty()) {
-            list.getChildren().add(Ui.meta("No templates yet. Open a plan and choose "
-                    + "\"Save as template\" to reuse it later."));
+            list.getChildren().add(Ui.meta(Messages.get("plans.templates.empty")));
         } else {
             for (LessonPlan template : templates) {
                 HBox line = new HBox(10);
@@ -531,13 +539,14 @@ public final class PlansScreen implements Refreshable {
                 line.getChildren().addAll(title,
                         Ui.pill(template.areaEnum().label(), "pill-count"),
                         Ui.spacer(),
-                        Ui.linkButton("Use on " + Dates.display(Dates.toIso(date)),
+                        Ui.linkButton(Messages.get("plans.templates.use",
+                                        Dates.display(Dates.toIso(date))),
                                 () -> createFromTemplate(template)),
-                        Ui.linkButton("Delete", () -> delete(template)));
+                        Ui.linkButton(Messages.get("common.delete"), () -> delete(template)));
                 list.getChildren().add(line);
             }
         }
-        return Ui.cardWithHeader("Templates", null, list);
+        return Ui.cardWithHeader(Messages.get("plans.templates.title"), null, list);
     }
 
     private void createFromTemplate(LessonPlan template) {
@@ -559,25 +568,25 @@ public final class PlansScreen implements Refreshable {
     private void saveAsTemplate(LessonPlan plan) {
         try {
             context.repo().plans().duplicate(plan.getId(), null, true);
-            Ui.info("Template saved",
-                    "\"" + plan.getTitle() + "\" can now be reused from the templates list.");
+            Ui.info(Messages.get("plans.templateSaved"),
+                    Messages.get("plans.templateSavedBody", plan.getTitle()));
             refresh();
         } catch (RuntimeException ex) {
-            Ui.error("Could not save this template", ex);
+            Ui.error(Messages.get("plans.error.saveTemplate"), ex);
         }
     }
 
     private void copyPlan(LessonPlan plan) {
         DatePicker picker = Ui.datePicker(date.plusDays(7));
-        Stage dialog = modalStage("Copy \"" + plan.getTitle() + "\"");
+        Stage dialog = modalStage(Messages.get("plans.copy.title", plan.getTitle()));
         VBox body = new VBox(10,
-                Ui.meta("A copy is created as a new planned activity, keeping the title, "
-                        + "objectives and materials."),
-                Ui.field("New date", picker));
+                Ui.meta(Messages.get("plans.copy.explain")),
+                Ui.field(Messages.get("plans.copy.newDate"), picker));
         body.setPadding(new Insets(16, 18, 16, 18));
         body.setPrefWidth(420);
-        HBox buttons = new HBox(8, Ui.spacer(), Ui.button("Cancel", dialog::close),
-                Ui.primaryButton("Create copy", () -> {
+        HBox buttons = new HBox(8, Ui.spacer(),
+                Ui.button(Messages.get("common.cancel"), dialog::close),
+                Ui.primaryButton(Messages.get("plans.copy.action"), () -> {
                     if (picker.getValue() == null) {
                         return;
                     }
@@ -588,7 +597,7 @@ public final class PlansScreen implements Refreshable {
                         context.notifyDataChanged();
                         dialog.close();
                     } catch (RuntimeException ex) {
-                        Ui.error("Could not copy this plan", ex);
+                        Ui.error(Messages.get("plans.error.copy"), ex);
                     }
                 }));
         buttons.setAlignment(Pos.CENTER_RIGHT);
@@ -597,9 +606,11 @@ public final class PlansScreen implements Refreshable {
     }
 
     private void delete(LessonPlan plan) {
-        if (!Ui.confirmDestructive("Delete this " + (plan.isTemplate() ? "template" : "activity") + "?",
-                "\"" + plan.getTitle() + "\" will be removed. This cannot be undone.",
-                "Delete")) {
+        String kind = Messages.get(plan.isTemplate()
+                ? "plans.delete.template" : "plans.delete.activity");
+        if (!Ui.confirmDestructive(Messages.get("plans.delete.title", kind),
+                Messages.get("plans.delete.body", plan.getTitle()),
+                Messages.get("common.delete"))) {
             return;
         }
         context.repo().plans().delete(plan.getId());
@@ -621,9 +632,9 @@ public final class PlansScreen implements Refreshable {
     }
 
     private void openFormWith(LessonPlan draft, boolean creating) {
-        Stage dialog = modalStage(creating ? "Plan an activity" : "Edit activity");
+        Stage dialog = modalStage(Messages.get(creating ? "plans.newTitle" : "plans.editTitle"));
 
-        TextField title = Ui.textField(draft.getTitle(), "e.g. Story sequencing", 30);
+        TextField title = Ui.textField(draft.getTitle(), Messages.get("plans.field.titleHint"), 30);
         DatePicker start = Ui.datePicker(Dates.fromIso(draft.getDate()));
         DatePicker end = Ui.datePicker(Dates.fromIso(draft.effectiveEndDate()));
         TextField startTime = Ui.textField(draft.getStartTime(), "09:30", 8);
@@ -636,7 +647,7 @@ public final class PlansScreen implements Refreshable {
         group.setConverter(new StringConverter<>() {
             @Override
             public String toString(Group value) {
-                return value == null ? "(all classes)" : value.getName();
+                return value == null ? Messages.get("common.allClasses") : value.getName();
             }
 
             @Override
@@ -684,22 +695,21 @@ public final class PlansScreen implements Refreshable {
         status.setPrefWidth(160);
 
         TextArea objectives = Ui.textArea(draft.getObjectives(), 3);
-        objectives.setPromptText("What should the children learn or practise?");
+        objectives.setPromptText(Messages.get("plans.field.objectivesHint"));
         TextArea description = Ui.textArea(draft.getDescription(), 4);
-        description.setPromptText("What will happen during the activity?");
+        description.setPromptText(Messages.get("plans.field.activitiesHint"));
         TextArea sequence = Ui.textArea(draft.getSequence(), 4);
-        sequence.setPromptText("Step by step, e.g.\n1. Gather on the carpet\n2. Read the story\n"
-                + "3. Order the picture cards");
+        sequence.setPromptText(Messages.get("plans.field.sequenceHint"));
         TextArea materials = Ui.textArea(draft.getMaterials(), 3);
-        materials.setPromptText("Everything needed, one per line");
+        materials.setPromptText(Messages.get("plans.field.materialsHint"));
         TextArea instructions = Ui.textArea(draft.getInstructions(), 3);
-        instructions.setPromptText("Anything to remember on the day");
+        instructions.setPromptText(Messages.get("plans.field.instructionsHint"));
         TextArea reflection = Ui.textArea(draft.getReflection(), 3);
-        reflection.setPromptText("Written afterwards: how it went, what to change");
+        reflection.setPromptText(Messages.get("plans.field.reflectionHint"));
 
-        CheckBox template = new CheckBox("Keep as a reusable template");
+        CheckBox template = new CheckBox(Messages.get("plans.field.keepTemplate"));
         template.setSelected(draft.isTemplate());
-        CheckBox recurring = new CheckBox("Part of the weekly routine");
+        CheckBox recurring = new CheckBox(Messages.get("plans.field.recurring"));
         recurring.setSelected(draft.isRecurring());
 
         Label error = new Label();
@@ -708,21 +718,21 @@ public final class PlansScreen implements Refreshable {
         error.setManaged(false);
 
         GridPane grid = Ui.formGrid();
-        grid.add(Ui.field("Title", title), 0, 0, 2, 1);
-        grid.add(Ui.field("Class", group), 0, 1);
-        grid.add(Ui.field("Subject area", area), 1, 1);
-        grid.add(Ui.field("Date", start), 0, 2);
-        grid.add(Ui.field("Last day (for a multi-day project)", end), 1, 2);
-        grid.add(Ui.field("Starts", startTime), 0, 3);
-        grid.add(Ui.field("Ends", endTime), 1, 3);
-        grid.add(Ui.field("Status", status), 0, 4);
+        grid.add(Ui.field(Messages.get("plans.field.title"), title), 0, 0, 2, 1);
+        grid.add(Ui.field(Messages.get("plans.field.class"), group), 0, 1);
+        grid.add(Ui.field(Messages.get("plans.field.area"), area), 1, 1);
+        grid.add(Ui.field(Messages.get("plans.field.date"), start), 0, 2);
+        grid.add(Ui.field(Messages.get("plans.field.lastDay"), end), 1, 2);
+        grid.add(Ui.field(Messages.get("plans.field.starts"), startTime), 0, 3);
+        grid.add(Ui.field(Messages.get("plans.field.ends"), endTime), 1, 3);
+        grid.add(Ui.field(Messages.get("plans.field.status"), status), 0, 4);
         grid.add(Ui.row(template, recurring), 1, 4);
-        grid.add(Ui.field("Learning objectives", objectives), 0, 5, 2, 1);
-        grid.add(Ui.field("Planned activities", description), 0, 6, 2, 1);
-        grid.add(Ui.field("Sequence of activities", sequence), 0, 7, 2, 1);
-        grid.add(Ui.field("Materials", materials), 0, 8, 2, 1);
-        grid.add(Ui.field("Notes for the teacher", instructions), 0, 9, 2, 1);
-        grid.add(Ui.field("Reflection after the activity", reflection), 0, 10, 2, 1);
+        grid.add(Ui.field(Messages.get("plans.field.objectives"), objectives), 0, 5, 2, 1);
+        grid.add(Ui.field(Messages.get("plans.field.activities"), description), 0, 6, 2, 1);
+        grid.add(Ui.field(Messages.get("plans.field.sequence"), sequence), 0, 7, 2, 1);
+        grid.add(Ui.field(Messages.get("plans.field.materials"), materials), 0, 8, 2, 1);
+        grid.add(Ui.field(Messages.get("plans.field.instructions"), instructions), 0, 9, 2, 1);
+        grid.add(Ui.field(Messages.get("plans.field.reflection"), reflection), 0, 10, 2, 1);
 
         VBox body = new VBox(12, grid, error);
         body.setPadding(new Insets(16, 18, 8, 18));
@@ -730,22 +740,22 @@ public final class PlansScreen implements Refreshable {
 
         Runnable save = () -> {
             if (Text.isBlank(title.getText())) {
-                showFormError(error, "Please give the activity a title.");
+                showFormError(error, Messages.get("plans.error.noTitle"));
                 title.requestFocus();
                 return;
             }
             if (start.getValue() == null) {
-                showFormError(error, "Please choose the date.");
+                showFormError(error, Messages.get("plans.error.noDate"));
                 return;
             }
             if (end.getValue() != null && end.getValue().isBefore(start.getValue())) {
-                showFormError(error, "The last day cannot be before the first day.");
+                showFormError(error, Messages.get("plans.error.endBeforeStart"));
                 return;
             }
             String startText = Text.clean(startTime.getText());
             String endText = Text.clean(endTime.getText());
             if (!startText.isEmpty() && !startText.matches("\\d{1,2}[:.]\\d{2}")) {
-                showFormError(error, "Please write times as HH:MM, for example 09:30.");
+                showFormError(error, Messages.get("plans.error.badTime"));
                 startTime.requestFocus();
                 return;
             }
@@ -774,12 +784,13 @@ public final class PlansScreen implements Refreshable {
                 context.notifyDataChanged();
                 dialog.close();
             } catch (RuntimeException ex) {
-                Ui.error("Could not save this activity", ex);
+                Ui.error(Messages.get("plans.error.save"), ex);
             }
         };
 
-        HBox buttons = new HBox(8, Ui.spacer(), Ui.button("Cancel", dialog::close),
-                Ui.primaryButton(creating ? "Save activity" : "Save changes", save));
+        HBox buttons = new HBox(8, Ui.spacer(),
+                Ui.button(Messages.get("common.cancel"), dialog::close),
+                Ui.primaryButton(Messages.get(creating ? "plans.save.new" : "plans.save.edit"), save));
         buttons.setPadding(new Insets(0, 18, 16, 18));
         buttons.setAlignment(Pos.CENTER_RIGHT);
 

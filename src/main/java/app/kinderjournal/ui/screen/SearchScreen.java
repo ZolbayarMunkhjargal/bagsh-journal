@@ -1,6 +1,7 @@
 package app.kinderjournal.ui.screen;
 
 import app.kinderjournal.db.Repository;
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.Child;
 import app.kinderjournal.model.Choices;
 import app.kinderjournal.model.Group;
@@ -45,7 +46,7 @@ public final class SearchScreen implements Refreshable {
     private final AppContext context;
     private final MainShell shell;
     private final ScrollPane root = Ui.scroll(new VBox());
-    private final TextField keywordField = Ui.textField("", "Search notes, interviews and plans\u2026", 30);
+    private final TextField keywordField = Ui.textField("", Messages.get("search.field"), 30);
 
     private String keyword = "";
     private long groupId;
@@ -77,12 +78,12 @@ public final class SearchScreen implements Refreshable {
 
     @Override
     public String title() {
-        return "Search";
+        return Messages.get("search.title");
     }
 
     @Override
     public String subtitle() {
-        return "Find any observation, interview, plan or child record stored on this computer.";
+        return Messages.get("search.subtitle");
     }
 
     @Override
@@ -114,8 +115,9 @@ public final class SearchScreen implements Refreshable {
         top.setAlignment(Pos.CENTER_LEFT);
         keywordField.setText(keyword);
         keywordField.setOnAction(event -> runSearch());
-        top.getChildren().addAll(keywordField, Ui.primaryButton("Search", this::runSearch),
-                Ui.button("Clear", this::clearAll));
+        top.getChildren().addAll(keywordField,
+                Ui.primaryButton(Messages.get("button.search"), this::runSearch),
+                Ui.button(Messages.get("common.clear"), this::clearAll));
         card.getChildren().add(top);
 
         HBox filters = new HBox(10);
@@ -127,7 +129,7 @@ public final class SearchScreen implements Refreshable {
         groupChoice.setConverter(new StringConverter<>() {
             @Override
             public String toString(Group value) {
-                return value == null ? "All classes" : value.getName();
+                return value == null ? Messages.get("common.allClasses") : value.getName();
             }
 
             @Override
@@ -152,7 +154,7 @@ public final class SearchScreen implements Refreshable {
         childChoice.setConverter(new StringConverter<>() {
             @Override
             public String toString(Child value) {
-                return value == null ? "All children" : value.fullName();
+                return value == null ? Messages.get("common.allChildren") : value.fullName();
             }
 
             @Override
@@ -176,39 +178,44 @@ public final class SearchScreen implements Refreshable {
         fromPicker.valueProperty().addListener((observable, previous, next) -> from = next);
         toPicker.valueProperty().addListener((observable, previous, next) -> to = next);
 
-        filters.getChildren().addAll(Ui.fieldLabel("Class"), groupChoice,
-                Ui.fieldLabel("Child"), childChoice,
-                Ui.fieldLabel("From"), fromPicker, Ui.fieldLabel("To"), toPicker);
+        filters.getChildren().addAll(Ui.fieldLabel(Messages.get("common.class")), groupChoice,
+                Ui.fieldLabel(Messages.get("common.child")), childChoice,
+                Ui.fieldLabel(Messages.get("common.from")), fromPicker,
+                Ui.fieldLabel(Messages.get("common.to")), toPicker);
         card.getChildren().add(filters);
 
         HBox types = new HBox(14);
         types.setAlignment(Pos.CENTER_LEFT);
-        types.getChildren().add(Ui.fieldLabel("Record types"));
+        types.getChildren().add(Ui.fieldLabel(Messages.get("search.recordTypes")));
         types.getChildren().addAll(
-                typeCheck("Child profiles", includeChildren, value -> includeChildren = value),
-                typeCheck("Observations", includeObservations, value -> includeObservations = value),
-                typeCheck("Interview notes", includeInterviews, value -> includeInterviews = value),
-                typeCheck("Activity plans", includePlans, value -> includePlans = value));
+                typeCheck(Messages.get("search.type.children"), includeChildren,
+                        value -> includeChildren = value),
+                typeCheck(Messages.get("search.type.observations"), includeObservations,
+                        value -> includeObservations = value),
+                typeCheck(Messages.get("search.type.interviews"), includeInterviews,
+                        value -> includeInterviews = value),
+                typeCheck(Messages.get("search.type.plans"), includePlans,
+                        value -> includePlans = value));
         card.getChildren().add(types);
 
         HBox narrow = new HBox(10);
         narrow.setAlignment(Pos.CENTER_LEFT);
 
         Map<String, String> categories = new LinkedHashMap<>();
-        categories.put("", "Any category");
+        categories.put("", Messages.get("common.anyCategory"));
         categories.putAll(Choices.observationLabelMap());
         narrow.getChildren().addAll(
-                Ui.fieldLabel("Observation category"),
+                Ui.fieldLabel(Messages.get("search.obsCategory")),
                 labelledCombo(categories, category, value -> {
                     category = value;
                     refresh();
                 }, 210),
-                Ui.fieldLabel("Interview type"),
+                Ui.fieldLabel(Messages.get("search.interviewType")),
                 labelledCombo(interviewTypes(), interviewType, value -> {
                     interviewType = value;
                     refresh();
                 }, 200),
-                Ui.fieldLabel("Plan status"),
+                Ui.fieldLabel(Messages.get("search.planStatus")),
                 labelledCombo(planStatuses(), planStatus, value -> {
                     planStatus = value;
                     refresh();
@@ -218,17 +225,17 @@ public final class SearchScreen implements Refreshable {
         HBox bottom = new HBox(10);
         bottom.setAlignment(Pos.CENTER_LEFT);
         bottom.getChildren().addAll(
-                Ui.fieldLabel("Plan subject"),
+                Ui.fieldLabel(Messages.get("search.planSubject")),
                 labelledCombo(planAreas(), planArea, value -> {
                     planArea = value;
                     refresh();
                 }, 200),
                 Ui.spacer(),
-                Ui.button("Search again", this::runSearch),
-                Ui.button("Send results to a report", this::sendToReport));
+                Ui.button(Messages.get("button.searchAgain"), this::runSearch),
+                Ui.button(Messages.get("button.sendToReport"), this::sendToReport));
         card.getChildren().add(bottom);
 
-        return Ui.card("Search criteria", card);
+        return Ui.card(Messages.get("search.criteria"), card);
     }
 
     private CheckBox typeCheck(String label, boolean selected, java.util.function.Consumer<Boolean> setter) {
@@ -262,7 +269,7 @@ public final class SearchScreen implements Refreshable {
 
     private Map<String, String> interviewTypes() {
         Map<String, String> map = new LinkedHashMap<>();
-        map.put("", "Any type");
+        map.put("", Messages.get("common.anyType"));
         for (Choices.InterviewType type : Choices.InterviewType.values()) {
             map.put(type.id(), type.label());
         }
@@ -271,7 +278,7 @@ public final class SearchScreen implements Refreshable {
 
     private Map<String, String> planStatuses() {
         Map<String, String> map = new LinkedHashMap<>();
-        map.put("", "Any status");
+        map.put("", Messages.get("common.anyStatus"));
         for (Choices.PlanStatus status : Choices.PlanStatus.values()) {
             map.put(status.id(), status.label());
         }
@@ -280,7 +287,7 @@ public final class SearchScreen implements Refreshable {
 
     private Map<String, String> planAreas() {
         Map<String, String> map = new LinkedHashMap<>();
-        map.put("", "Any subject");
+        map.put("", Messages.get("common.anySubject"));
         for (Choices.PlanArea area : Choices.PlanArea.values()) {
             map.put(area.id(), area.label());
         }
@@ -316,8 +323,8 @@ public final class SearchScreen implements Refreshable {
                 from, to, category, interviewType, planStatus, planArea,
                 includeChildren, includeObservations, includeInterviews, includePlans, limit);
         if (query.isEmpty()) {
-            Ui.warn("Nothing to search for",
-                    "Enter a keyword, or choose a class, a child or a date range.");
+            Ui.warn(Messages.get("search.nothingToSearch"),
+                    Messages.get("search.nothingToSearchBody"));
             return;
         }
         try {
@@ -325,7 +332,7 @@ public final class SearchScreen implements Refreshable {
             searched = true;
             elapsed = ((System.nanoTime() - started) / 1_000_000) + " ms";
         } catch (RuntimeException ex) {
-            Ui.error("The search could not be completed", ex);
+            Ui.error(Messages.get("search.failed"), ex);
             results = new ArrayList<>();
             searched = true;
             elapsed = "";
@@ -337,33 +344,31 @@ public final class SearchScreen implements Refreshable {
         VBox box = new VBox(10);
 
         if (!searched) {
-            box.getChildren().add(Ui.emptyState("Search your records",
-                    "Type a word that appears in a note - for example \"communication\" - and "
-                            + "KinderJournal looks through observations, interview notes, activity "
-                            + "plans and child profiles at once. Everything is searched on this "
-                            + "computer; nothing is sent anywhere.",
-                    null));
-            return Ui.card("Results", box);
+            box.getChildren().add(Ui.emptyState(Messages.get("search.empty.title"),
+                    Messages.get("search.empty.body"), null));
+            return Ui.card(Messages.get("search.results"), box);
         }
 
         HBox summary = new HBox(10);
         summary.setAlignment(Pos.CENTER_LEFT);
         summary.getChildren().addAll(
-                Ui.screenTitle(results.size() == 1 ? "1 match" : results.size() + " matches"),
-                Text.isBlank(elapsed) ? new Label() : Ui.meta("in " + elapsed));
+                Ui.screenTitle(results.size() == 1
+                        ? Messages.get("search.match")
+                        : Messages.get("search.matches", results.size())),
+                Text.isBlank(elapsed) ? new Label()
+                        : Ui.meta(Messages.get("search.inTime", elapsed)));
         if (results.size() >= limit) {
-            summary.getChildren().add(Ui.pill("showing the first " + limit, "pill-count"));
+            summary.getChildren().add(
+                    Ui.pill(Messages.get("search.showingFirst", limit), "pill-count"));
         }
         summary.getChildren().addAll(Ui.spacer(),
-                Ui.button("Export results as a report", this::sendToReport));
+                Ui.button(Messages.get("button.exportResults"), this::sendToReport));
         box.getChildren().add(summary);
 
         if (results.isEmpty()) {
-            box.getChildren().add(Ui.emptyState("No matches",
-                    "Nothing in your records contains that. Try a shorter or different word, or "
-                            + "widen the date range.",
-                    null));
-            return Ui.card("Results", box);
+            box.getChildren().add(Ui.emptyState(Messages.get("search.noMatches.title"),
+                    Messages.get("search.noMatches.body"), null));
+            return Ui.card(Messages.get("search.results"), box);
         }
 
         // Group the hits by month so a long list stays readable.
@@ -372,7 +377,7 @@ public final class SearchScreen implements Refreshable {
             String month = Text.isBlank(hit.date()) ? "" : hit.date().substring(0, 7);
             if (!month.equals(currentMonth)) {
                 currentMonth = month;
-                Label header = new Label(Text.isBlank(month) ? "Profiles"
+                Label header = new Label(Text.isBlank(month) ? Messages.get("search.profiles")
                         : monthHeader(month));
                 header.getStyleClass().add("section-title");
                 header.setPadding(new javafx.geometry.Insets(8, 0, 0, 2));
@@ -380,13 +385,12 @@ public final class SearchScreen implements Refreshable {
             }
             box.getChildren().add(RecordList.searchResult(hit, keyword, this::openHit));
         }
-        return Ui.card("Results", box);
+        return Ui.card(Messages.get("search.results"), box);
     }
 
     private String monthHeader(String month) {
         java.time.YearMonth yearMonth = java.time.YearMonth.parse(month);
-        return yearMonth.getMonth().getDisplayName(java.time.format.TextStyle.FULL,
-                java.util.Locale.ENGLISH) + " " + yearMonth.getYear();
+        return Dates.monthName(yearMonth.getYear(), yearMonth.getMonthValue());
     }
 
     /** Opens the record behind a search hit. */
@@ -431,7 +435,8 @@ public final class SearchScreen implements Refreshable {
 
     private void sendToReport() {
         if (results.isEmpty()) {
-            Ui.warn("Nothing to send", "Run a search first, then send the matches to a report.");
+            Ui.warn(Messages.get("search.nothingToSend"),
+                    Messages.get("search.nothingToSendBody"));
             return;
         }
         long group = groupId;
@@ -449,28 +454,32 @@ public final class SearchScreen implements Refreshable {
     public String criteriaSummary() {
         List<String> parts = new ArrayList<>();
         if (!Text.isBlank(keyword)) {
-            parts.add("keyword \"" + keyword + "\"");
+            parts.add(Messages.get("search.criteria.keyword", keyword));
         }
         if (groupId > 0) {
             Group group = context.repo().groups().find(groupId);
             if (group != null) {
-                parts.add("class " + group.getName());
+                parts.add(Messages.get("search.criteria.class", group.getName()));
             }
         }
         if (childId > 0) {
             Child child = context.repo().children().find(childId);
             if (child != null) {
-                parts.add("child " + child.fullName());
+                parts.add(Messages.get("search.criteria.child", child.fullName()));
             }
         }
         if (from != null || to != null) {
-            parts.add("dates " + (from == null ? "start" : Dates.display(Dates.toIso(from)))
-                    + " to " + (to == null ? "today" : Dates.display(Dates.toIso(to))));
+            String start = from == null
+                    ? Messages.get("search.criteria.start") : Dates.display(Dates.toIso(from));
+            String end = to == null
+                    ? Messages.get("common.today") : Dates.display(Dates.toIso(to));
+            parts.add(Messages.get("search.criteria.dates", start, end));
         }
         if (!Text.isBlank(category)) {
-            parts.add("category " + Choices.observationLabel(category));
+            parts.add(Messages.get("search.criteria.category", Choices.observationLabel(category)));
         }
-        return parts.isEmpty() ? "no criteria" : String.join(", ", parts);
+        return parts.isEmpty()
+                ? Messages.get("search.criteriaSummary") : String.join(", ", parts);
     }
 
     /** The current keyword, for callers that want to pre-fill a report. */

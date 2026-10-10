@@ -1,5 +1,6 @@
 package app.kinderjournal.ui;
 
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.util.Dates;
 import app.kinderjournal.util.Text;
 
@@ -92,14 +93,16 @@ public final class CalendarMonth {
         grid.setHgap(0);
         grid.setVgap(0);
 
-        String[] weekdayNames = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+        // Weekday names come from the selected language, so the column headings
+        // match the calendar's own month names.
+        LocalDate firstColumn = Dates.startOfWeek(month.atDay(1));
         for (int i = 0; i < 7; i++) {
             ColumnConstraints column = new ColumnConstraints();
             column.setPercentWidth(100.0 / 7);
             column.setHgrow(Priority.ALWAYS);
             grid.getColumnConstraints().add(column);
 
-            Label header = new Label(weekdayNames[i]);
+            Label header = new Label(Dates.weekdayShort(firstColumn.plusDays(i)));
             header.getStyleClass().add("calendar-header");
             header.setMaxWidth(Double.MAX_VALUE);
             grid.add(header, i, 0);
@@ -159,8 +162,7 @@ public final class CalendarMonth {
         number.getStyleClass().add(isToday ? "calendar-day-number-today" : "calendar-day-number");
         top.getChildren().add(number);
         if (day.getDayOfMonth() == 1) {
-            Label monthName = new Label(day.getMonth().getDisplayName(
-                    java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH));
+            Label monthName = new Label(Dates.monthOnly(day));
             monthName.getStyleClass().add("calendar-day-number");
             top.getChildren().add(monthName);
         }
@@ -181,8 +183,9 @@ public final class CalendarMonth {
             }
         });
         cell.setCursor(javafx.scene.Cursor.HAND);
+        String dayText = Dates.displayLong(Dates.toIso(day));
         javafx.scene.control.Tooltip.install(cell,
-                new javafx.scene.control.Tooltip(Dates.displayLong(Dates.toIso(day))));
+                new javafx.scene.control.Tooltip(Messages.get("calendar.clickDay", dayText)));
         return cell;
     }
 
@@ -209,12 +212,12 @@ public final class CalendarMonth {
         }
         HBox line = new HBox(4);
         line.setAlignment(Pos.CENTER_LEFT);
-        Label presentLabel = new Label(present + " present");
+        Label presentLabel = new Label(Messages.get("calendar.present", present));
         presentLabel.getStyleClass().add("calendar-marker");
         presentLabel.setStyle("-fx-background-color: #e6f4ea; -fx-text-fill: #1b5e20;");
         line.getChildren().add(presentLabel);
         if (absent > 0) {
-            Label absentLabel = new Label(absent + " absent");
+            Label absentLabel = new Label(Messages.get("calendar.absent", absent));
             absentLabel.getStyleClass().add("calendar-marker");
             absentLabel.setStyle("-fx-background-color: #fdecec; -fx-text-fill: #b3261e;");
             line.getChildren().add(absentLabel);

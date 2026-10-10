@@ -2,6 +2,7 @@ package app.kinderjournal.ui.screen;
 
 import app.kinderjournal.db.AttendanceDao;
 import app.kinderjournal.db.Repository;
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.Child;
 import app.kinderjournal.model.Group;
 import app.kinderjournal.model.Observation;
@@ -57,12 +58,12 @@ public final class ClassesScreen implements Refreshable {
 
     @Override
     public String title() {
-        return "Classes";
+        return Messages.get("classes.title");
     }
 
     @Override
     public String subtitle() {
-        return "Each class is the container for its children and their journal records.";
+        return Messages.get("classes.subtitle");
     }
 
     @Override
@@ -83,21 +84,22 @@ public final class ClassesScreen implements Refreshable {
             }
         }
 
+        String classCount = Messages.get(groups.size() == 1 ? "count.class" : "count.classes",
+                groups.size());
         VBox page = Ui.page();
         HBox header = new HBox(10);
         header.setAlignment(Pos.CENTER_LEFT);
         header.getChildren().addAll(
-                Ui.screenTitle("Your classes"),
-                Ui.meta(Text.plural(groups.size(), "class", "classes")),
+                Ui.screenTitle(Messages.get("classes.heading")),
+                Ui.meta(classCount),
                 Ui.spacer(),
-                Ui.primaryButton("New class", this::openNewForm));
+                Ui.primaryButton(Messages.get("classes.new"), this::openNewForm));
         page.getChildren().add(header);
 
         if (groups.isEmpty()) {
-            page.getChildren().add(Ui.emptyState("No classes yet",
-                    "Create a class such as \"Sunflower group\" or \"Morning group\". Children, "
-                            + "attendance and lesson plans all belong to a class.",
-                    Ui.primaryButton("Create the first class", this::openNewForm)));
+            page.getChildren().add(Ui.emptyState(Messages.get("classes.empty.title"),
+                    Messages.get("classes.empty.body"),
+                    Ui.primaryButton(Messages.get("classes.empty.action"), this::openNewForm)));
             root.setContent(page);
             return;
         }
@@ -111,7 +113,7 @@ public final class ClassesScreen implements Refreshable {
         }
 
         VBox right = selected == null
-                ? new VBox(Ui.meta("Select a class to see its details."))
+                ? new VBox(Ui.meta(Messages.get("classes.selectPrompt")))
                 : buildDetail(selected);
         HBox.setHgrow(right, Priority.ALWAYS);
 
@@ -126,10 +128,10 @@ public final class ClassesScreen implements Refreshable {
         int children = group.getChildCount();
         String subtitle = Text.joinNonBlank(" \u00b7 ",
                 group.subtitle(),
-                Text.plural(children, "child", "children"),
-                group.isArchived() ? "archived" : "");
+                Messages.get(children == 1 ? "count.child" : "count.children", children),
+                group.isArchived() ? Messages.get("classes.archived") : "");
         return RecordList.selectableRow(null, group.getName(), subtitle,
-                group.getId() == context.currentGroupId() ? "current" : "",
+                group.getId() == context.currentGroupId() ? Messages.get("classes.current") : "",
                 selected, () -> {
                     selectedGroupId = group.getId();
                     refresh();
@@ -158,26 +160,28 @@ public final class ClassesScreen implements Refreshable {
         name.getStyleClass().add("screen-title");
         names.getChildren().add(name);
         Label sub = new Label(Text.joinNonBlank(" \u00b7 ", group.subtitle(),
-                group.getTeacher().isBlank() ? "" : "Teacher: " + group.getTeacher()));
+                group.getTeacher().isBlank() ? ""
+                        : Messages.get("classForm.teacher") + ": " + group.getTeacher()));
         sub.getStyleClass().add("meta");
         names.getChildren().add(sub);
         head.getChildren().addAll(names, Ui.spacer());
         if (group.getId() != context.currentGroupId()) {
-            head.getChildren().add(Ui.primaryButton("Work on this class",
+            head.getChildren().add(Ui.primaryButton(Messages.get("classes.workOnThis"),
                     () -> context.setCurrentGroup(group)));
         } else {
-            head.getChildren().add(Ui.pill("Current class", "pill-completed"));
+            head.getChildren().add(Ui.pill(Messages.get("classes.currentBadge"), "pill-completed"));
         }
         box.getChildren().addAll(head,
-                Ui.row(Ui.button("Edit details", () -> openForm(group)),
-                        Ui.button(group.isArchived() ? "Restore class" : "Archive class",
+                Ui.row(Ui.button(Messages.get("classes.editDetails"), () -> openForm(group)),
+                        Ui.button(group.isArchived() ? Messages.get("classes.restore")
+                                : Messages.get("classes.archive"),
                                 () -> toggleArchive(group)),
-                        Ui.dangerButton("Delete class", () -> deleteGroup(group))));
+                        Ui.dangerButton(Messages.get("classes.delete"), () -> deleteGroup(group))));
 
         // --- children
         VBox childList = new VBox(6);
         if (children.isEmpty()) {
-            childList.getChildren().add(Ui.meta("No children in this class yet."));
+            childList.getChildren().add(Ui.meta(Messages.get("classes.noChildren")));
         } else {
             for (Child child : children) {
                 HBox line = new HBox(10);
@@ -191,30 +195,34 @@ public final class ClassesScreen implements Refreshable {
                     line.getChildren().add(Ui.meta(age));
                 }
                 line.getChildren().add(Ui.spacer());
-                line.getChildren().add(Ui.linkButton("Open profile", () -> {
+                line.getChildren().add(Ui.linkButton(Messages.get("button.openProfile"), () -> {
                     context.setCurrentChild(child);
                     shell.show("children");
                 }));
                 childList.getChildren().add(line);
             }
         }
-        box.getChildren().add(Ui.cardWithHeader("Children  (" + children.size() + ")",
-                Ui.linkButton("Manage children \u2192", () -> shell.show("children")), childList));
+        box.getChildren().add(Ui.cardWithHeader(
+                Messages.get("classes.childrenHeading", children.size()),
+                Ui.linkButton(Messages.get("classes.manageChildren"), () -> shell.show("children")),
+                childList));
 
         // --- activity summary
         VBox stats = new VBox(6,
-                Ui.keyValue("Children", String.valueOf(children.size())),
-                Ui.keyValue("Attendance records (last 30 days)", String.valueOf(summary.recorded())),
-                Ui.keyValue("Attendance rate", summary.rateText()),
-                Ui.keyValue("Observations (last 30 days)", String.valueOf(recent.size())),
-                Ui.keyValue("Interviews (last 30 days)", String.valueOf(interviews)),
-                Ui.keyValue("Activities planned (last 30 days)", String.valueOf(plans)));
-        box.getChildren().add(Ui.card("Class activity", stats));
+                Ui.keyValue(Messages.get("classes.activity.children"), String.valueOf(children.size())),
+                Ui.keyValue(Messages.get("classes.activity.attendanceRecords"),
+                        String.valueOf(summary.recorded())),
+                Ui.keyValue(Messages.get("classes.activity.attendanceRate"), summary.rateText()),
+                Ui.keyValue(Messages.get("classes.activity.observations"),
+                        String.valueOf(recent.size())),
+                Ui.keyValue(Messages.get("classes.activity.interviews"), String.valueOf(interviews)),
+                Ui.keyValue(Messages.get("classes.activity.plans"), String.valueOf(plans)));
+        box.getChildren().add(Ui.card(Messages.get("classes.activity"), stats));
 
         // --- recent observations
         VBox recentList = new VBox(6);
         if (recent.isEmpty()) {
-            recentList.getChildren().add(Ui.meta("No observations for this class in the last 30 days."));
+            recentList.getChildren().add(Ui.meta(Messages.get("classes.noRecentObservations")));
         } else {
             for (Observation observation : recent.subList(0, Math.min(5, recent.size()))) {
                 HBox line = new HBox(8);
@@ -233,7 +241,8 @@ public final class ClassesScreen implements Refreshable {
                 recentList.getChildren().add(line);
             }
         }
-        box.getChildren().add(Ui.cardWithHeader("Recent observations", null, recentList));
+        box.getChildren().add(Ui.cardWithHeader(Messages.get("classes.recentObservations"), null,
+                recentList));
 
         return box;
     }
@@ -253,15 +262,19 @@ public final class ClassesScreen implements Refreshable {
             draft.setSortOrder(context.repo().groups().listAll().size());
         }
 
-        Stage dialog = modalStage(creating ? "New class" : "Edit class");
+        Stage dialog = modalStage(creating
+                ? Messages.get("classForm.newTitle")
+                : Messages.get("classForm.editTitle"));
 
-        TextField name = Ui.textField(draft.getName(), "e.g. Sunflower group", 28);
-        TextField ageRange = Ui.textField(draft.getAgeRange(), "e.g. 4\u20135", 12);
-        TextField room = Ui.textField(draft.getRoom(), "e.g. Room 2", 16);
-        TextField teacher = Ui.textField(draft.getTeacher(), "Your name", 22);
-        TextField year = Ui.textField(draft.getSchoolYear(), "e.g. 2025/2026", 12);
+        TextField name = Ui.textField(draft.getName(), Messages.get("classForm.nameHint"), 28);
+        TextField ageRange = Ui.textField(draft.getAgeRange(),
+                Messages.get("classForm.ageRangeHint"), 12);
+        TextField room = Ui.textField(draft.getRoom(), Messages.get("classForm.roomHint"), 16);
+        TextField teacher = Ui.textField(draft.getTeacher(), Messages.get("classForm.teacherHint"), 22);
+        TextField year = Ui.textField(draft.getSchoolYear(),
+                Messages.get("classForm.schoolYearHint"), 12);
         TextArea description = Ui.textArea(draft.getDescription(), 3);
-        description.setPromptText("Anything worth remembering about this group");
+        description.setPromptText(Messages.get("classForm.descriptionHint"));
 
         Label error = new Label();
         error.getStyleClass().add("form-error");
@@ -269,12 +282,12 @@ public final class ClassesScreen implements Refreshable {
         error.setManaged(false);
 
         GridPane grid = Ui.formGrid();
-        grid.add(Ui.field("Class name", name), 0, 0, 2, 1);
-        grid.add(Ui.field("Age range", ageRange), 0, 1);
-        grid.add(Ui.field("Room", room), 1, 1);
-        grid.add(Ui.field("Teacher", teacher), 0, 2);
-        grid.add(Ui.field("School year", year), 1, 2);
-        grid.add(Ui.field("Description", description), 0, 3, 2, 1);
+        grid.add(Ui.field(Messages.get("classForm.name"), name), 0, 0, 2, 1);
+        grid.add(Ui.field(Messages.get("classForm.ageRange"), ageRange), 0, 1);
+        grid.add(Ui.field(Messages.get("classForm.room"), room), 1, 1);
+        grid.add(Ui.field(Messages.get("classForm.teacher"), teacher), 0, 2);
+        grid.add(Ui.field(Messages.get("classForm.schoolYear"), year), 1, 2);
+        grid.add(Ui.field(Messages.get("classForm.description"), description), 0, 3, 2, 1);
 
         VBox body = new VBox(12, grid, error);
         body.setPadding(new Insets(16, 18, 8, 18));
@@ -283,13 +296,13 @@ public final class ClassesScreen implements Refreshable {
         Runnable save = () -> {
             String value = Text.clean(name.getText());
             if (value.isEmpty()) {
-                showFormError(error, "Please give the class a name.");
+                showFormError(error, Messages.get("classForm.error.noName"));
                 name.requestFocus();
                 return;
             }
             Group duplicate = context.repo().groups().findByName(value);
             if (duplicate != null && duplicate.getId() != draft.getId()) {
-                showFormError(error, "Another class already uses the name \"" + value + "\".");
+                showFormError(error, Messages.get("classForm.error.duplicate", value));
                 return;
             }
             draft.setName(value);
@@ -309,12 +322,13 @@ public final class ClassesScreen implements Refreshable {
                 context.notifyDataChanged();
                 dialog.close();
             } catch (RuntimeException ex) {
-                Ui.error("Could not save this class", ex);
+                Ui.error(Messages.get("classForm.error.save"), ex);
             }
         };
 
-        HBox buttons = new HBox(8, Ui.spacer(), Ui.button("Cancel", dialog::close),
-                Ui.primaryButton(creating ? "Create class" : "Save changes", save));
+        HBox buttons = new HBox(8, Ui.spacer(), Ui.button(Messages.get("common.cancel"), dialog::close),
+                Ui.primaryButton(creating ? Messages.get("classForm.save.new")
+                        : Messages.get("classForm.save.edit"), save));
         buttons.setPadding(new Insets(0, 18, 16, 18));
         buttons.setAlignment(Pos.CENTER_RIGHT);
 
@@ -325,8 +339,7 @@ public final class ClassesScreen implements Refreshable {
     private void toggleArchive(Group group) {
         boolean archiving = !group.isArchived();
         if (archiving && group.getId() == context.currentGroupId()) {
-            Ui.warn("This is the class you are working on",
-                    "Switch to another class first, then archive this one.");
+            Ui.warn(Messages.get("classArchive.inUseTitle"), Messages.get("classArchive.inUseBody"));
             return;
         }
         group.setArchived(archiving);
@@ -335,29 +348,27 @@ public final class ClassesScreen implements Refreshable {
             context.reloadCurrentGroup();
             context.notifyDataChanged();
         } catch (RuntimeException ex) {
-            Ui.error("Could not archive this class", ex);
+            Ui.error(Messages.get("classArchive.error"), ex);
         }
     }
 
     private void deleteGroup(Group group) {
         int children = context.repo().groups().childCount(group.getId());
         if (children > 0) {
-            boolean archive = Ui.confirm("Move the children first",
-                    group.getName() + " still has " + Text.plural(children, "child", "children")
-                            + ". A class can only be deleted when it is empty, so that no child's "
-                            + "history is lost. Move them to another class, then delete this one.\n\n"
-                            + "You can archive the class instead: it is hidden from the class picker "
-                            + "but everything stays.",
-                    "Archive instead");
+            String childCount = Messages.get(children == 1 ? "count.child" : "count.children",
+                    children);
+            boolean archive = Ui.confirm(Messages.get("classDelete.blockedTitle"),
+                    Messages.get("classDelete.blockedBody", group.getName(), childCount)
+                            + "\n\n" + Messages.get("classDelete.blockedBody2"),
+                    Messages.get("classDelete.archiveInstead"));
             if (archive) {
                 toggleArchive(group);
             }
             return;
         }
-        if (!Ui.confirmDestructive("Delete \"" + group.getName() + "\"?",
-                "The class will be removed. Its lesson plans stay in the database but are no longer "
-                        + "attached to a class. This cannot be undone.",
-                "Delete class")) {
+        if (!Ui.confirmDestructive(Messages.get("classDelete.title", group.getName()),
+                Messages.get("classDelete.body"),
+                Messages.get("classDelete.confirm"))) {
             return;
         }
         try {
@@ -366,7 +377,7 @@ public final class ClassesScreen implements Refreshable {
             context.reloadCurrentGroup();
             context.notifyDataChanged();
         } catch (RuntimeException ex) {
-            Ui.error("Could not delete this class", ex);
+            Ui.error(Messages.get("classDelete.error"), ex);
         }
     }
 

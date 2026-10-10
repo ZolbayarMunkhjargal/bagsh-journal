@@ -4,6 +4,8 @@ import app.kinderjournal.db.Repository;
 import app.kinderjournal.model.Child;
 import app.kinderjournal.model.Group;
 import app.kinderjournal.model.HistoryEntry;
+import app.kinderjournal.i18n.Lang;
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.report.HtmlPreview;
 import app.kinderjournal.report.ReportOptions;
 import app.kinderjournal.report.ReportRenderer;
@@ -146,6 +148,35 @@ public final class UiSmokeTest {
                 check("screen refreshes repeatedly: " + key + detail, ok);
             }
 
+            // Every screen must build in Mongolian too, because each one creates
+            // its labels in its constructor from the catalogue.
+            check("language switches to Mongolian", Messages.setCurrent(Lang.MONGOLIAN));
+            check("interface language is Mongolian", Messages.current() == Lang.MONGOLIAN);
+            for (String key : keys) {
+                boolean ok = true;
+                String detail = "";
+                try {
+                    shell.show(key);
+                    if (shell.visibleContentNodeCount() == 0) {
+                        ok = false;
+                        detail = " \u2013 nothing on display";
+                    }
+                } catch (Throwable ex) {
+                    ok = false;
+                    detail = " \u2013 " + ex;
+                    ex.printStackTrace(System.out);
+                }
+                check("screen builds in Mongolian: " + key + detail, ok);
+            }
+            check("sidebar is rebuilt in Mongolian",
+                    containsCyrillic(textOf(shell.root())));
+            check("language choice is written to the database",
+                    Lang.MONGOLIAN.code().equals(repo.db().setting("language", "")));
+            check("switching back to English works", Messages.setCurrent(Lang.ENGLISH));
+            check("English screen builds after switching back", buildsWithoutError(shell, "dashboard"));
+            check("English choice is persisted",
+                    Lang.ENGLISH.code().equals(repo.db().setting("language", "")));
+
             // Records can be added through the UI-level helpers, then the screens
             // that display them must still build.
             check("quick observation capture works", writeThroughRepository(repo));
@@ -172,6 +203,29 @@ public final class UiSmokeTest {
             fail("smoke test aborted: " + ex);
             ex.printStackTrace(System.out);
         }
+    }
+
+    /** All label text in a node tree, for checking that a language took effect. */
+    private static String textOf(javafx.scene.Node node) {
+        StringBuilder sb = new StringBuilder();
+        collectText(node, sb);
+        return sb.toString();
+    }
+
+    private static void collectText(javafx.scene.Node node, StringBuilder sb) {
+        if (node instanceof javafx.scene.control.Labeled labelled && labelled.getText() != null) {
+            sb.append(labelled.getText()).append('\n');
+        }
+        if (node instanceof javafx.scene.Parent parent) {
+            for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) {
+                collectText(child, sb);
+            }
+        }
+    }
+
+    /** True when the text contains Cyrillic, which only the Mongolian catalogue uses. */
+    private static boolean containsCyrillic(String text) {
+        return text.matches("(?s).*[\\u0400-\\u04FF].*");
     }
 
     private boolean buildsWithoutError(MainShell shell, String key) {

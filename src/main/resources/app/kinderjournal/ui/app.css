@@ -150,6 +150,24 @@
     -fx-text-fill: kj-muted;
 }
 
+/* The language button sits in the status bar; it shows the language it switches
+   to, written in that language's own script. */
+.language-toggle {
+    -fx-background-color: #eef1f4;
+    -fx-text-fill: kj-accent;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 20;
+    -fx-padding: 2 12 2 12;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+}
+
+.language-toggle:hover {
+    -fx-background-color: kj-accent-soft;
+    -fx-text-fill: #0b5f59;
+}
+
 /* ------------------------------------------------------------------ cards */
 
 .card {

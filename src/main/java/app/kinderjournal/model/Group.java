@@ -118,7 +118,7 @@ public class Group {
     public String subtitle() {
         StringBuilder sb = new StringBuilder();
         if (!ageRange.isBlank()) {
-            sb.append("Ages ").append(ageRange);
+            sb.append(app.kinderjournal.i18n.Messages.get("group.ageRange", ageRange));
         }
         if (!room.isBlank()) {
             if (sb.length() > 0) {

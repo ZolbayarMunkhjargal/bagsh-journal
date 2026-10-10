@@ -279,7 +279,12 @@ public final class Db implements AutoCloseable {
         } catch (SQLException ex) {
             throw new DataException("Creating the database tables", ex);
         }
-        saveSetting("created_at", now());
+
+        // Defaults for a new installation. Only written when absent, so an
+        // existing choice is never overwritten by an upgrade.
+        saveSettingIfAbsent("created_at", now());
+        saveSettingIfAbsent("language", app.kinderjournal.i18n.Lang.ENGLISH.code());
+        saveSettingIfAbsent("teacher_name", "");
     }
 
     // ------------------------------------------------------------- transactions
@@ -423,6 +428,12 @@ public final class Db implements AutoCloseable {
     public void saveSetting(String key, String value) {
         update("INSERT INTO settings(key, value) VALUES(?, ?) "
                 + "ON CONFLICT(key) DO UPDATE SET value = excluded.value", key, value == null ? "" : value);
+    }
+
+    /** Writes a setting only when it has no value yet, so upgrades keep choices. */
+    public void saveSettingIfAbsent(String key, String value) {
+        update("INSERT INTO settings(key, value) VALUES(?, ?) ON CONFLICT(key) DO NOTHING",
+                key, value == null ? "" : value);
     }
 
     // ------------------------------------------------------- integrity and backup

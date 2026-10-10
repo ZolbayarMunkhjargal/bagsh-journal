@@ -1,5 +1,6 @@
 package app.kinderjournal.ui.screen;
 
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.Child;
 import app.kinderjournal.model.Choices;
 import app.kinderjournal.model.Group;
@@ -83,12 +84,12 @@ public final class ReportsScreen implements Refreshable {
 
     @Override
     public String title() {
-        return "Print and reports";
+        return Messages.get("reports.title");
     }
 
     @Override
     public String subtitle() {
-        return "Build a printable document from your records, preview it, then print or save as PDF.";
+        return Messages.get("reports.subtitle");
     }
 
     @Override
@@ -196,10 +197,10 @@ public final class ReportsScreen implements Refreshable {
         HBox header = new HBox(10);
         header.setAlignment(Pos.CENTER_LEFT);
         header.getChildren().addAll(
-                Ui.screenTitle("Build a report"),
-                Ui.meta("Reports contain only the notes you entered."),
+                Ui.screenTitle(Messages.get("reports.build")),
+                Ui.meta(Messages.get("reports.onlyTeacherNotes")),
                 Ui.spacer(),
-                Ui.primaryButton("Preview", this::preview));
+                Ui.primaryButton(Messages.get("reports.preview"), this::preview));
         page.getChildren().add(header);
 
         HBox columns = new HBox(16);
@@ -246,19 +247,19 @@ public final class ReportsScreen implements Refreshable {
             row.setCursor(javafx.scene.Cursor.HAND);
             list.getChildren().add(row);
         }
-        return new VBox(10, Ui.sectionTitle("Document"), list);
+        return new VBox(10, Ui.sectionTitle(Messages.get("reports.document")), list);
     }
 
     private VBox buildOptions() {
         VBox box = new VBox(16);
-        box.getChildren().add(Ui.card("Who and when", buildWhoGrid()));
-        box.getChildren().add(Ui.card("What to include", buildContentOptions()));
-        box.getChildren().add(Ui.card("Your note to the reader", buildNotesArea()));
+        box.getChildren().add(Ui.card(Messages.get("reports.whoAndWhen"), buildWhoGrid()));
+        box.getChildren().add(Ui.card(Messages.get("reports.whatToInclude"), buildContentOptions()));
+        box.getChildren().add(Ui.card(Messages.get("reports.noteToReader"), buildNotesArea()));
         box.getChildren().add(buildPreviewSummary());
         box.getChildren().add(Ui.row(
-                Ui.primaryButton("Preview and print", this::preview),
-                Ui.button("Save without printing\u2026", this::saveOnly),
-                Ui.meta("Printing opens your system print dialog.")));
+                Ui.primaryButton(Messages.get("reports.previewAndPrint"), this::preview),
+                Ui.button(Messages.get("reports.saveWithoutPrinting"), this::saveOnly),
+                Ui.meta(Messages.get("reports.printHint"))));
         return box;
     }
 
@@ -271,7 +272,7 @@ public final class ReportsScreen implements Refreshable {
         groupChoice.setConverter(new StringConverter<>() {
             @Override
             public String toString(Group value) {
-                return value == null ? "(all classes)" : value.getName();
+                return value == null ? Messages.get("common.allClasses") : value.getName();
             }
 
             @Override
@@ -295,7 +296,7 @@ public final class ReportsScreen implements Refreshable {
         childChoice.setConverter(new StringConverter<>() {
             @Override
             public String toString(Child value) {
-                return value == null ? "(choose a child)" : value.fullName()
+                return value == null ? Messages.get("reports.chooseChild") : value.fullName()
                         + (value.getGroupName().isEmpty() ? "" : "  \u00b7  " + value.getGroupName());
             }
 
@@ -323,30 +324,30 @@ public final class ReportsScreen implements Refreshable {
         fromPicker.valueProperty().addListener((observable, previous, next) -> from = next);
         toPicker.valueProperty().addListener((observable, previous, next) -> to = next);
 
-        who.add(Ui.field("Class", groupChoice), 0, 0);
-        who.add(Ui.field(type.needsChild() ? "Child (required for this report)" : "Child (if needed)",
-                childChoice), 1, 0);
-        who.add(Ui.field("From", fromPicker), 0, 1);
-        who.add(Ui.field("To", toPicker), 1, 1);
+        who.add(Ui.field(Messages.get("common.class"), groupChoice), 0, 0);
+        who.add(Ui.field(type.needsChild() ? Messages.get("reports.childRequired")
+                : Messages.get("reports.childOptional"), childChoice), 1, 0);
+        who.add(Ui.field(Messages.get("common.from"), fromPicker), 0, 1);
+        who.add(Ui.field(Messages.get("common.to"), toPicker), 1, 1);
 
         HBox quick = new HBox(8,
-                Ui.button("Today", () -> setRange(LocalDate.now(), LocalDate.now())),
-                Ui.button("This week", () -> {
+                Ui.button(Messages.get("common.today"), () -> setRange(LocalDate.now(), LocalDate.now())),
+                Ui.button(Messages.get("common.thisWeek"), () -> {
                     LocalDate start = Dates.startOfWeek(LocalDate.now());
                     setRange(start, start.plusDays(6));
                 }),
-                Ui.button("This month", () -> {
+                Ui.button(Messages.get("common.thisMonth"), () -> {
                     LocalDate first = LocalDate.now().withDayOfMonth(1);
                     setRange(first, first.withDayOfMonth(first.lengthOfMonth()));
                 }),
-                Ui.button("Last 3 months", () -> setRange(LocalDate.now().minusMonths(3),
-                        LocalDate.now())),
-                Ui.button("School year", () -> {
+                Ui.button(Messages.get("common.last3Months"),
+                        () -> setRange(LocalDate.now().minusMonths(3), LocalDate.now())),
+                Ui.button(Messages.get("common.schoolYear"), () -> {
                     LocalDate today = LocalDate.now();
                     int startYear = today.getMonthValue() >= 8 ? today.getYear() : today.getYear() - 1;
                     setRange(LocalDate.of(startYear, 8, 1), today);
                 }));
-        who.add(Ui.row(Ui.fieldLabel("Quick ranges"), quick), 0, 2, 2, 1);
+        who.add(Ui.row(Ui.fieldLabel(Messages.get("reports.quickRanges")), quick), 0, 2, 2, 1);
         return who;
     }
 
@@ -359,24 +360,26 @@ public final class ReportsScreen implements Refreshable {
     private Node buildContentOptions() {
         VBox content = new VBox(8);
         content.getChildren().addAll(
-                includeCheck("Profile details and contacts", includeProfile,
+                includeCheck(Messages.get("reports.include.profile"), includeProfile,
                         value -> includeProfile = value),
-                includeCheck("Attendance totals", includeAttendanceSummary,
+                includeCheck(Messages.get("reports.include.attendanceSummary"), includeAttendanceSummary,
                         value -> includeAttendanceSummary = value),
-                includeCheck("Day-by-day attendance marks", includeAttendanceDetail,
+                includeCheck(Messages.get("reports.include.attendanceDetail"), includeAttendanceDetail,
                         value -> includeAttendanceDetail = value),
-                includeCheck("Observations", includeObservations,
+                includeCheck(Messages.get("reports.include.observations"), includeObservations,
                         value -> includeObservations = value),
-                includeCheck("Interview notes", includeInterviews,
+                includeCheck(Messages.get("reports.include.interviews"), includeInterviews,
                         value -> includeInterviews = value),
-                includeCheck("Activity plans", includePlans, value -> includePlans = value),
-                includeCheck("Photos", includePhotos, value -> includePhotos = value),
-                includeCheck("Include notes marked confidential", includeConfidential,
+                includeCheck(Messages.get("reports.include.plans"), includePlans,
+                        value -> includePlans = value),
+                includeCheck(Messages.get("reports.include.photos"), includePhotos,
+                        value -> includePhotos = value),
+                includeCheck(Messages.get("reports.include.confidential"), includeConfidential,
                         value -> includeConfidential = value));
 
         ComboBox<String> categoryChoice = new ComboBox<>();
         Map<String, String> categories = new LinkedHashMap<>();
-        categories.put("", "All observation categories");
+        categories.put("", Messages.get("common.allObsCategories"));
         categories.putAll(Choices.observationLabelMap());
         categoryChoice.getItems().addAll(categories.keySet());
         categoryChoice.setConverter(new StringConverter<>() {
@@ -396,15 +399,16 @@ public final class ReportsScreen implements Refreshable {
             category = next == null ? "" : next;
             refresh();
         });
-        content.getChildren().add(Ui.field("Restrict observations to one category", categoryChoice));
+        content.getChildren().add(Ui.field(Messages.get("reports.restrictCategory"), categoryChoice));
 
         if (type == ReportType.SEARCH_RESULTS) {
-            TextField keywordField = Ui.textField(keyword, "The word to search for", 24);
+            TextField keywordField = Ui.textField(keyword, Messages.get("reports.searchKeywordHint"),
+                    24);
             keywordField.textProperty().addListener((observable, previous, next) -> keyword = next);
-            content.getChildren().add(Ui.field("Search keyword", keywordField));
+            content.getChildren().add(Ui.field(Messages.get("reports.searchKeyword"), keywordField));
         }
 
-        CheckBox landscapeBox = new CheckBox("Print sideways (landscape)");
+        CheckBox landscapeBox = new CheckBox(Messages.get("reports.landscape"));
         landscapeBox.setSelected(landscape);
         landscapeBox.selectedProperty().addListener((observable, previous, next) -> landscape = next);
         content.getChildren().add(landscapeBox);
@@ -413,8 +417,7 @@ public final class ReportsScreen implements Refreshable {
 
     private TextArea buildNotesArea() {
         TextArea notesArea = Ui.textArea(notes, 3);
-        notesArea.setPromptText("Optional: a short introduction to appear at the top of the "
-                + "printed document");
+        notesArea.setPromptText(Messages.get("reports.noteHint"));
         notesArea.textProperty().addListener((observable, previous, next) -> notes = next);
         return notesArea;
     }
@@ -435,8 +438,7 @@ public final class ReportsScreen implements Refreshable {
                 list.getChildren().add(Ui.keyValue(entry.getKey(), String.valueOf(entry.getValue())));
             }
         } catch (RuntimeException ex) {
-            list.getChildren().add(Ui.meta("Choose a class and a period to see a summary of what "
-                    + "this report will contain."));
+            list.getChildren().add(Ui.meta(Messages.get("reports.summaryNeedsSelection")));
         }
         String warning = validationMessage();
         if (warning != null) {
@@ -447,17 +449,15 @@ public final class ReportsScreen implements Refreshable {
             banner.getChildren().add(label);
             list.getChildren().add(banner);
         }
-        return Ui.cardWithHeader("What this report will contain",
+        return Ui.cardWithHeader(Messages.get("reports.willContain"),
                 Ui.pill(type.label(), "pill-planned"), list);
     }
 
     private Node buildFootnote() {
         VBox box = new VBox(6);
-        box.getChildren().add(Ui.meta("Reports show the notes you entered, organised for printing. "
-                + "They contain personal information about children, so store and print them "
-                + "according to your school's policy. Long reports continue across pages "
-                + "automatically and carry page numbers when printed."));
-        box.getChildren().add(Ui.meta("Data folder: " + AppPaths.dataDir().toAbsolutePath()));
+        box.getChildren().add(Ui.meta(Messages.get("reports.footnote")));
+        box.getChildren().add(Ui.meta(Messages.get("status.dataFolder",
+                AppPaths.dataDir().toAbsolutePath())));
         return box;
     }
 
@@ -487,19 +487,19 @@ public final class ReportsScreen implements Refreshable {
     /** A plain-language reason the report cannot be built yet, or null. */
     private String validationMessage() {
         if (type.needsChild() && childId == 0) {
-            return "Choose the child this report is about.";
+            return Messages.get("reports.error.noChild");
         }
         if (type.needsGroup() && groupId == 0) {
-            return "Choose the class this report is about.";
+            return Messages.get("reports.error.noClass");
         }
         if (type == ReportType.SEARCH_RESULTS && Text.isBlank(keyword)) {
-            return "Enter the word to search for.";
+            return Messages.get("reports.error.noKeyword");
         }
         if (type != ReportType.SEARCH_RESULTS && from == null) {
-            return "Choose the first day of the period.";
+            return Messages.get("reports.error.noFrom");
         }
         if (from != null && to != null && from.isAfter(to)) {
-            return "The first day of the period is after the last day.";
+            return Messages.get("reports.error.rangeOrder");
         }
         return null;
     }
@@ -521,23 +521,24 @@ public final class ReportsScreen implements Refreshable {
             return;
         }
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Save report");
+        chooser.setTitle(Messages.get("reports.saveTitle"));
         chooser.setInitialFileName(ReportRenderer.suggestedFileName(currentOptions(), type.label()));
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Web page", "*.html"));
+        chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter(Messages.get("reports.saveFilter"), "*.html"));
         java.io.File chosen = chooser.showSaveDialog(shell.window());
         if (chosen == null) {
             return;
         }
         try {
             Files.writeString(chosen.toPath(), rendered.html());
-            if (Ui.confirm("Report saved",
-                    "Saved to:\n" + chosen.getAbsolutePath()
-                            + "\n\nOpen it now so you can print it or save it as a PDF?",
-                    "Open it")) {
+            if (Ui.confirm(Messages.get("reports.saved"),
+                    Messages.get("reports.savedBody") + "\n" + chosen.getAbsolutePath()
+                            + "\n\n" + Messages.get("reports.openIt"),
+                    Messages.get("reports.openItAction"))) {
                 ReportPreview.openExternally(chosen.toPath());
             }
         } catch (IOException ex) {
-            Ui.error("Could not save the report", ex);
+            Ui.error(Messages.get("reports.couldNotSave"), ex);
         }
     }
 
@@ -545,18 +546,19 @@ public final class ReportsScreen implements Refreshable {
     private ReportRenderer.Rendered generate() {
         String problem = validationMessage();
         if (problem != null) {
-            Ui.warn("This report is not ready yet", problem);
+            Ui.warn(Messages.get("reports.notReady"), problem);
             return null;
         }
         try {
             ReportRenderer.Rendered rendered = renderer.render(currentOptions());
             if (rendered.isEmpty()) {
-                Ui.warn("Nothing to print", "There is no content for this selection.");
+                Ui.warn(Messages.get("reports.nothingToPrint"),
+                        Messages.get("reports.nothingToPrintBody"));
                 return null;
             }
             return rendered;
         } catch (RuntimeException ex) {
-            Ui.error("The report could not be generated", ex);
+            Ui.error(Messages.get("reports.couldNotGenerate"), ex);
             return null;
         }
     }

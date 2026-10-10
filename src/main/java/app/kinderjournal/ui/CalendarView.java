@@ -1,5 +1,6 @@
 package app.kinderjournal.ui;
 
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.util.Dates;
 
 import javafx.geometry.Pos;
@@ -35,9 +36,9 @@ public final class CalendarView {
         this.selected = initialDate;
         this.grid = new CalendarMonth(month, selected).decorator(decorator);
 
-        Button previous = Ui.button("\u2039", () -> stepMonth(-1));
-        Button next = Ui.button("\u203a", () -> stepMonth(1));
-        Button today = Ui.button("Today", () -> {
+        Button previous = Ui.button(Messages.get("calendar.previous"), () -> stepMonth(-1));
+        Button next = Ui.button(Messages.get("calendar.next"), () -> stepMonth(1));
+        Button today = Ui.button(Messages.get("calendar.today"), () -> {
             selected = LocalDate.now();
             month = YearMonth.from(selected);
             rebuild();
@@ -111,9 +112,15 @@ public final class CalendarView {
     }
 
     private void updateMonthLabel() {
-        monthLabel.setText(month.getMonth().getDisplayName(
-                java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH) + " " + month.getYear()
-                + (selected != null ? "   \u00b7   selected: " + Dates.display(Dates.toIso(selected)) : ""));
+        String heading = Dates.monthName(month.getYear(), month.getMonthValue());
+        if (selected == null) {
+            monthLabel.setText(heading);
+            return;
+        }
+        // The selection is a second thought beside the month, so it is set off by
+        // a separator that lives in the translated text rather than in Java.
+        monthLabel.setText(heading + "   |   "
+                + Messages.get("calendar.selected", Dates.display(Dates.toIso(selected))));
     }
 
     /** A legend row for the calendar, reused by both calendars. */

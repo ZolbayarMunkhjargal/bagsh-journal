@@ -2,6 +2,7 @@ package app.kinderjournal.ui.screen;
 
 import app.kinderjournal.db.AttendanceDao;
 import app.kinderjournal.db.Repository;
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.Child;
 import app.kinderjournal.model.Choices;
 import app.kinderjournal.model.Group;
@@ -51,14 +52,14 @@ public final class DashboardScreen implements Refreshable {
 
     @Override
     public String title() {
-        return "Dashboard";
+        return Messages.get("dashboard.title");
     }
 
     @Override
     public String subtitle() {
         String group = context.currentGroup() == null ? "" : context.currentGroup().getName();
         String teacher = context.teacherName();
-        String greeting = Text.isBlank(teacher) ? "" : "Welcome back, " + teacher + ". ";
+        String greeting = Text.isBlank(teacher) ? "" : Messages.get("dashboard.welcome", teacher);
         return greeting + Dates.displayLong(Dates.toIso(today))
                 + (group.isEmpty() ? "" : "  \u00b7  " + group);
     }
@@ -119,25 +120,27 @@ public final class DashboardScreen implements Refreshable {
 
         HBox selector = new HBox(10);
         selector.setAlignment(Pos.CENTER_LEFT);
-        selector.getChildren().addAll(Ui.fieldLabel("Class"), MainShell.groupSelector(context));
+        selector.getChildren().addAll(Ui.fieldLabel(Messages.get("classPicker.label")),
+                MainShell.groupSelector(context));
         if (!group.subtitle().isBlank()) {
             selector.getChildren().add(Ui.meta(group.subtitle()));
         }
         box.getChildren().add(selector);
 
         if (roster == 0) {
-            box.getChildren().add(banner("info",
-                    "This class has no children yet. Add the first child to start keeping "
-                            + "attendance and observations.",
-                    "Add a child", () -> shell.showAnd("children", screen -> {
+            String message = Messages.get("dashboard.noChildren.title") + ". "
+                    + Messages.get("dashboard.noChildren.body");
+            box.getChildren().add(banner("info", message, Messages.get("button.addChild"),
+                    () -> shell.showAnd("children", screen -> {
                         if (screen instanceof ChildrenScreen children) {
                             children.openNewChildForm();
                         }
                     })));
         } else if (!registerStarted) {
             box.getChildren().add(banner("warning",
-                    "Today's attendance has not been recorded for " + group.getName() + " yet.",
-                    "Record attendance", () -> shell.showAnd("attendance", screen -> {
+                    Messages.get("dashboard.registerPending.body", group.getName()),
+                    Messages.get("dashboard.registerPending.action"),
+                    () -> shell.showAnd("attendance", screen -> {
                         if (screen instanceof AttendanceScreen attendance) {
                             attendance.goToDate(today);
                         }
@@ -162,10 +165,10 @@ public final class DashboardScreen implements Refreshable {
 
     private Node buildNoClassState() {
         return Ui.page(Ui.emptyState(
-                "No class yet",
-                "KinderJournal organises everything by class. Create your first class to begin "
-                        + "adding children, taking attendance and writing observations.",
-                Ui.primaryButton("Create a class", () -> shell.show("classes"))));
+                Messages.get("dashboard.noClass.title"),
+                Messages.get("dashboard.noClass.body"),
+                Ui.primaryButton(Messages.get("dashboard.noClass.action"),
+                        () -> shell.show("classes"))));
     }
 
     // ------------------------------------------------------------------- tiles
@@ -175,8 +178,10 @@ public final class DashboardScreen implements Refreshable {
         FlowPane pane = new FlowPane(12, 12);
 
         int children = register.size();
-        pane.getChildren().add(tile(String.valueOf(children), "Children in " + shortName(group),
-                children == 1 ? "1 profile" : "profiles listed"));
+        pane.getChildren().add(tile(String.valueOf(children),
+                Messages.get("dashboard.tiles.children", shortName(group)),
+                children == 1 ? Messages.get("dashboard.tiles.profile")
+                        : Messages.get("dashboard.tiles.profiles")));
 
         long present = register.stream()
                 .filter(row -> row.recorded() && row.status().countedAsAttending()).count();
@@ -184,24 +189,31 @@ public final class DashboardScreen implements Refreshable {
                 .filter(row -> row.recorded() && row.status() == Choices.AttendanceStatus.ABSENT).count();
         boolean any = register.stream().anyMatch(Repository.RegisterRow::recorded);
         pane.getChildren().add(tile(any ? present + "/" + children : "\u2013",
-                "Present today",
-                any ? absent + " absent" : "not recorded yet", !any));
+                Messages.get("dashboard.tiles.presentToday"),
+                any ? Messages.get("dashboard.tiles.absentCount", absent)
+                        : Messages.get("dashboard.tiles.notRecorded"), !any));
 
         int obsToday = context.repo().observations().countOn(today);
-        pane.getChildren().add(tile(String.valueOf(obsToday), "Observations today",
-                obsToday == 0 ? "none written yet" : "keep it up", obsToday == 0));
+        pane.getChildren().add(tile(String.valueOf(obsToday),
+                Messages.get("dashboard.tiles.observationsToday"),
+                obsToday == 0 ? Messages.get("dashboard.tiles.noneYet")
+                        : Messages.get("dashboard.tiles.keepItUp"), obsToday == 0));
 
         LocalDate weekEnd = today.plusDays(6);
         List<LessonPlan> week = context.repo().plans().listBetween(group.getId(), today, weekEnd);
         int completed = (int) week.stream()
                 .filter(p -> p.statusEnum() == Choices.PlanStatus.COMPLETED).count();
-        pane.getChildren().add(tile(String.valueOf(week.size()), "Activities this week",
-                week.isEmpty() ? "nothing planned" : completed + " completed so far",
+        pane.getChildren().add(tile(String.valueOf(week.size()),
+                Messages.get("dashboard.tiles.activitiesThisWeek"),
+                week.isEmpty() ? Messages.get("dashboard.tiles.nothingPlanned")
+                        : Messages.get("dashboard.tiles.completedSoFar", completed),
                 week.isEmpty()));
 
         int followUps = context.repo().interviews().listDueFollowUps(7, 50).size();
-        pane.getChildren().add(tile(String.valueOf(followUps), "Follow-ups due",
-                followUps == 0 ? "nothing outstanding" : "within the next week", followUps == 0));
+        pane.getChildren().add(tile(String.valueOf(followUps),
+                Messages.get("dashboard.tiles.followUpsDue"),
+                followUps == 0 ? Messages.get("dashboard.tiles.nothingOutstanding")
+                        : Messages.get("dashboard.tiles.withinWeek"), followUps == 0));
 
         return pane;
     }
@@ -235,29 +247,32 @@ public final class DashboardScreen implements Refreshable {
     private Node buildQuickActions(Group group) {
         FlowPane pane = new FlowPane(8, 8);
         pane.getChildren().addAll(
-                Ui.primaryButton("Record today's attendance", () -> shell.showAnd("attendance",
-                        screen -> {
+                Ui.primaryButton(Messages.get("button.recordAttendance"),
+                        () -> shell.showAnd("attendance", screen -> {
                             if (screen instanceof AttendanceScreen attendance) {
                                 attendance.goToDate(today);
                             }
                         })),
-                Ui.button("Add an observation", () -> shell.showAnd("observations", screen -> {
-                    if (screen instanceof ObservationsScreen observations) {
-                        observations.openNewForm(null);
-                    }
-                })),
-                Ui.button("Record an interview", () -> shell.showAnd("interviews", screen -> {
-                    if (screen instanceof InterviewsScreen interviews) {
-                        interviews.openNewForm(null);
-                    }
-                })),
-                Ui.button("Plan an activity", () -> shell.showAnd("plans", screen -> {
-                    if (screen instanceof PlansScreen plans) {
-                        plans.openNewForm(today);
-                    }
-                })),
-                Ui.button("Open a child's history", () -> shell.show("history")),
-                Ui.button("Print a report", () -> shell.show("reports")));
+                Ui.button(Messages.get("button.addObservation"),
+                        () -> shell.showAnd("observations", screen -> {
+                            if (screen instanceof ObservationsScreen observations) {
+                                observations.openNewForm(null);
+                            }
+                        })),
+                Ui.button(Messages.get("button.recordInterview"),
+                        () -> shell.showAnd("interviews", screen -> {
+                            if (screen instanceof InterviewsScreen interviews) {
+                                interviews.openNewForm(null);
+                            }
+                        })),
+                Ui.button(Messages.get("button.planActivity"),
+                        () -> shell.showAnd("plans", screen -> {
+                            if (screen instanceof PlansScreen plans) {
+                                plans.openNewForm(today);
+                            }
+                        })),
+                Ui.button(Messages.get("button.openHistory"), () -> shell.show("history")),
+                Ui.button(Messages.get("button.printReport"), () -> shell.show("reports")));
         return pane;
     }
 
@@ -269,9 +284,9 @@ public final class DashboardScreen implements Refreshable {
         boolean any = register.stream().anyMatch(Repository.RegisterRow::recorded);
 
         if (register.isEmpty()) {
-            rows.add(Ui.meta("No children in this class yet."));
+            rows.add(Ui.meta(Messages.get("dashboard.noChildrenInClass")));
         } else if (!any) {
-            rows.add(Ui.meta("Nothing recorded for today. Everyone will start as Present."));
+            rows.add(Ui.meta(Messages.get("dashboard.nothingRecordedToday")));
         }
 
         for (Repository.RegisterRow row : register) {
@@ -302,13 +317,16 @@ public final class DashboardScreen implements Refreshable {
         }
 
         if (any) {
-            rows.add(Ui.keyValue("Attendance rate",
-                    summary.rateText() + "  (" + summary.attending() + " of " + summary.recorded() + ")"));
+            rows.add(Ui.keyValue(Messages.get("dashboard.rateLine"),
+                    Messages.get("dashboard.rateValue", summary.rateText(),
+                            summary.attending(), summary.recorded())));
         }
 
-        Node openButton = Ui.linkButton("Open the register \u2192", () -> shell.show("attendance"));
-        return Ui.cardWithHeader("Today \u00b7 " + Dates.display(Dates.toIso(today)), openButton,
-                RecordList.stack(rows));
+        Node openButton = Ui.linkButton(Messages.get("dashboard.openRegister"),
+                () -> shell.show("attendance"));
+        return Ui.cardWithHeader(
+                Messages.get("dashboard.todayAttendance", Dates.display(Dates.toIso(today))),
+                openButton, RecordList.stack(rows));
     }
 
     // ------------------------------------------------------------ recent card
@@ -321,14 +339,14 @@ public final class DashboardScreen implements Refreshable {
 
         VBox list = new VBox(8);
         if (observations.isEmpty()) {
-            list.getChildren().add(Ui.emptyState("No observations in the last two weeks",
-                    "Notes you write about individual children appear here so you can pick up "
-                            + "where you left off.",
-                    Ui.button("Write the first one", () -> shell.showAnd("observations", screen -> {
-                        if (screen instanceof ObservationsScreen observationsScreen) {
-                            observationsScreen.openNewForm(null);
-                        }
-                    }))));
+            list.getChildren().add(Ui.emptyState(Messages.get("dashboard.recent.empty"),
+                    Messages.get("dashboard.recent.emptyBody"),
+                    Ui.button(Messages.get("dashboard.recent.first"),
+                            () -> shell.showAnd("observations", screen -> {
+                                if (screen instanceof ObservationsScreen observationsScreen) {
+                                    observationsScreen.openNewForm(null);
+                                }
+                            }))));
         } else {
             for (Observation observation : observations) {
                 HistoryEntry entry = new HistoryEntry(observation.getDate(),
@@ -346,8 +364,9 @@ public final class DashboardScreen implements Refreshable {
             }
         }
 
-        Node openButton = Ui.linkButton("All observations \u2192", () -> shell.show("observations"));
-        return Ui.cardWithHeader("Latest journal entries", openButton, list);
+        Node openButton = Ui.linkButton(Messages.get("dashboard.recent.all"),
+                () -> shell.show("observations"));
+        return Ui.cardWithHeader(Messages.get("dashboard.recent.title"), openButton, list);
     }
 
     // ---------------------------------------------------------- upcoming card
@@ -361,7 +380,8 @@ public final class DashboardScreen implements Refreshable {
         for (LessonPlan plan : plans) {
             String when = plan.isRange()
                     ? plan.dateRangeLabel()
-                    : (plan.getDate().equals(Dates.toIso(today)) ? "Today" : Dates.display(plan.getDate()));
+                    : (plan.getDate().equals(Dates.toIso(today)) ? Messages.get("common.today")
+                            : Dates.display(plan.getDate()));
             HBox line = new HBox(10);
             line.setAlignment(Pos.CENTER_LEFT);
             Label title = new Label(plan.getTitle());
@@ -380,8 +400,10 @@ public final class DashboardScreen implements Refreshable {
             wrapper.setCursor(javafx.scene.Cursor.HAND);
             list.getChildren().add(wrapper);
         }
-        Node openButton = Ui.linkButton("Weekly plan \u2192", () -> shell.show("plans"));
-        return Ui.cardWithHeader("Coming up in " + group.getName(), openButton, list);
+        Node openButton = Ui.linkButton(Messages.get("dashboard.upcoming.weekly"),
+                () -> shell.show("plans"));
+        return Ui.cardWithHeader(Messages.get("dashboard.upcoming.title", group.getName()),
+                openButton, list);
     }
 
     // -------------------------------------------------------- follow-ups card
@@ -402,8 +424,9 @@ public final class DashboardScreen implements Refreshable {
             VBox wrapper = new VBox(2, line);
             Label meta = new Label(Text.joinNonBlank(" \u00b7 ", interview.getChildName(),
                     interview.typeEnum().label(),
-                    interview.getFollowUpDate() == null ? "" : "due "
-                            + Dates.display(interview.getFollowUpDate())));
+                    interview.getFollowUpDate() == null ? ""
+                            : Messages.get("dashboard.followUps.due",
+                                    Dates.display(interview.getFollowUpDate()))));
             meta.getStyleClass().add("meta");
             wrapper.getChildren().add(meta);
             wrapper.getStyleClass().add("list-row");
@@ -411,6 +434,6 @@ public final class DashboardScreen implements Refreshable {
             wrapper.setCursor(javafx.scene.Cursor.HAND);
             list.getChildren().add(wrapper);
         }
-        return Ui.cardWithHeader("Follow-ups to revisit", null, list);
+        return Ui.cardWithHeader(Messages.get("dashboard.followUps.title"), null, list);
     }
 }

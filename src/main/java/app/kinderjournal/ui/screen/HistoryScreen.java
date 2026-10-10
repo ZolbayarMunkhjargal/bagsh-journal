@@ -1,6 +1,7 @@
 package app.kinderjournal.ui.screen;
 
 import app.kinderjournal.db.Repository;
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.Child;
 import app.kinderjournal.model.Choices;
 import app.kinderjournal.model.Group;
@@ -33,12 +34,10 @@ import javafx.util.StringConverter;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -74,12 +73,12 @@ public final class HistoryScreen implements Refreshable {
 
     @Override
     public String title() {
-        return "Child history";
+        return Messages.get("history.title");
     }
 
     @Override
     public String subtitle() {
-        return "Attendance, observations, interviews and activities woven into one timeline.";
+        return Messages.get("history.subtitle");
     }
 
     @Override
@@ -113,10 +112,10 @@ public final class HistoryScreen implements Refreshable {
         page.getChildren().add(buildToolbar(children, child));
 
         if (child == null) {
-            page.getChildren().add(Ui.emptyState("No child selected",
-                    "Choose a child above to see everything recorded about them, or add a child "
-                            + "first.",
-                    Ui.primaryButton("Go to children", () -> shell.show("children"))));
+            page.getChildren().add(Ui.emptyState(Messages.get("history.noChild.title"),
+                    Messages.get("history.noChild.body"),
+                    Ui.primaryButton(Messages.get("history.noChild.action"),
+                            () -> shell.show("children"))));
             root.setContent(page);
             return;
         }
@@ -127,12 +126,12 @@ public final class HistoryScreen implements Refreshable {
         page.getChildren().add(buildSummaryCard(child, entries));
 
         if (entries.isEmpty()) {
-            String name = Text.isBlank(child.getFirstName()) ? "this child" : child.getFirstName();
-            page.getChildren().add(Ui.emptyState("Nothing recorded in this period",
-                    "Widen the date range above, or start by writing an observation about "
-                            + name + ".",
-                    Ui.primaryButton("Add an observation", () -> shell.showAnd("observations",
-                            target -> {
+            String name = Text.isBlank(child.getFirstName())
+                    ? Messages.get("history.thisChild") : child.getFirstName();
+            page.getChildren().add(Ui.emptyState(Messages.get("history.empty.title"),
+                    Messages.get("history.empty.body", name),
+                    Ui.primaryButton(Messages.get("history.empty.action"),
+                            () -> shell.showAnd("observations", target -> {
                                 if (target instanceof ObservationsScreen observations) {
                                     observations.openNewForm(child);
                                 }
@@ -166,7 +165,7 @@ public final class HistoryScreen implements Refreshable {
         }
 
         VBox detail = focused == null
-                ? new VBox(Ui.meta("Select an entry on the left to read it in full."))
+                ? new VBox(Ui.meta(Messages.get("history.selectPrompt")))
                 : buildDetail(child, focused);
         HBox.setHgrow(detail, Priority.ALWAYS);
 
@@ -211,14 +210,15 @@ public final class HistoryScreen implements Refreshable {
             }
         });
 
-        line.getChildren().addAll(Ui.fieldLabel("Child"), childChoice, Ui.spacer());
+        line.getChildren().addAll(Ui.fieldLabel(Messages.get("history.child")), childChoice,
+                Ui.spacer());
         if (child != null) {
             line.getChildren().addAll(
-                    Ui.button("Whole profile", () -> {
+                    Ui.button(Messages.get("history.wholeProfile"), () -> {
                         context.setCurrentChild(child);
                         shell.show("children");
                     }),
-                    Ui.button("Print history", () -> printHistory(child)));
+                    Ui.button(Messages.get("history.printHistory"), () -> printHistory(child)));
         }
         box.getChildren().add(line);
 
@@ -238,7 +238,7 @@ public final class HistoryScreen implements Refreshable {
 
         ComboBox<String> categoryChoice = new ComboBox<>();
         Map<String, String> categories = new LinkedHashMap<>();
-        categories.put("all", "All categories");
+        categories.put("all", Messages.get("common.allObsCategories"));
         categories.putAll(Choices.observationLabelMap());
         categoryChoice.getItems().addAll(categories.keySet());
         categoryChoice.setConverter(new StringConverter<>() {
@@ -260,11 +260,12 @@ public final class HistoryScreen implements Refreshable {
         });
 
         filters.getChildren().addAll(
-                Ui.fieldLabel("From"), fromPicker, Ui.fieldLabel("To"), toPicker,
-                Ui.fieldLabel("Category"), categoryChoice,
-                Ui.button("Last 3 months", () -> setRange(3)),
-                Ui.button("Last 6 months", () -> setRange(6)),
-                Ui.button("This year", () -> {
+                Ui.fieldLabel(Messages.get("common.from")), fromPicker,
+                Ui.fieldLabel(Messages.get("common.to")), toPicker,
+                Ui.fieldLabel(Messages.get("common.category")), categoryChoice,
+                Ui.button(Messages.get("history.last3"), () -> setRange(3)),
+                Ui.button(Messages.get("history.last6"), () -> setRange(6)),
+                Ui.button(Messages.get("history.thisYear"), () -> {
                     from = LocalDate.of(LocalDate.now().getYear(), 1, 1);
                     to = LocalDate.now();
                     refresh();
@@ -277,7 +278,11 @@ public final class HistoryScreen implements Refreshable {
         javafx.scene.control.ToggleGroup typeGroup = new javafx.scene.control.ToggleGroup();
         String[] options = {"all", HistoryEntry.Kind.ATTENDANCE.id(), HistoryEntry.Kind.OBSERVATION.id(),
                 HistoryEntry.Kind.INTERVIEW.id(), HistoryEntry.Kind.PLAN.id()};
-        String[] labels = {"Everything", "Attendance", "Observations", "Interviews", "Activities"};
+        String[] labels = {Messages.get("history.show.everything"),
+                Messages.get("history.show.attendance"),
+                Messages.get("history.show.observations"),
+                Messages.get("history.show.interviews"),
+                Messages.get("history.show.activities")};
         for (int i = 0; i < options.length; i++) {
             javafx.scene.control.ToggleButton button =
                     new javafx.scene.control.ToggleButton(labels[i]);
@@ -295,7 +300,7 @@ public final class HistoryScreen implements Refreshable {
             });
             types.getChildren().add(button);
         }
-        box.getChildren().add(Ui.row(Ui.fieldLabel("Show"), types));
+        box.getChildren().add(Ui.row(Ui.fieldLabel(Messages.get("history.show.label")), types));
         return box;
     }
 
@@ -328,9 +333,11 @@ public final class HistoryScreen implements Refreshable {
         Label name = new Label(child.fullName());
         name.getStyleClass().add("screen-title");
         Label meta = new Label(Text.joinNonBlank(" \u00b7 ",
-                child.getGroupName().isEmpty() ? "No class" : child.getGroupName(),
+                child.getGroupName().isEmpty()
+                        ? Messages.get("common.noClass") : child.getGroupName(),
                 child.birthSummary(),
-                Dates.display(Dates.toIso(from)) + " to " + Dates.display(Dates.toIso(to))));
+                Messages.get("history.range", Dates.display(Dates.toIso(from)),
+                        Dates.display(Dates.toIso(to)))));
         meta.getStyleClass().add("meta");
         names.getChildren().addAll(name, meta);
         head.getChildren().addAll(names, Ui.spacer());
@@ -354,11 +361,12 @@ public final class HistoryScreen implements Refreshable {
             }
         }
         YearMonth yearMonth = month.isEmpty() ? YearMonth.now() : YearMonth.parse(month);
-        String label = yearMonth.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH)
-                + " " + yearMonth.getYear();
+        // Month and year headings follow the interface language, like every other date.
+        String label = Dates.monthName(yearMonth.getYear(), yearMonth.getMonthValue());
         HBox box = new HBox(8,
                 Ui.sectionTitle(label),
-                Ui.pill(count + (count == 1 ? " record" : " records"), "pill-count"));
+                Ui.pill(Messages.get(count == 1 ? "history.record" : "history.records", count),
+                        "pill-count"));
         box.setAlignment(Pos.CENTER_LEFT);
         box.setPadding(new Insets(10, 0, 2, 2));
         return box;
@@ -417,16 +425,17 @@ public final class HistoryScreen implements Refreshable {
         HBox actions = new HBox(8);
         actions.setAlignment(Pos.CENTER_LEFT);
         actions.getChildren().addAll(
-                Ui.button("Open profile", () -> {
+                Ui.button(Messages.get("button.openProfile"), () -> {
                     context.setCurrentChild(child);
                     shell.show("children");
                 }),
-                Ui.button("Write a new observation", () -> shell.showAnd("observations", target -> {
-                    if (target instanceof ObservationsScreen observations) {
-                        observations.openNewForm(child);
-                    }
-                })),
-                focusedRecordId != 0 ? Ui.button("Clear selection", () -> {
+                Ui.button(Messages.get("history.writeObservation"),
+                        () -> shell.showAnd("observations", target -> {
+                            if (target instanceof ObservationsScreen observations) {
+                                observations.openNewForm(child);
+                            }
+                        })),
+                focusedRecordId != 0 ? Ui.button(Messages.get("history.clearSelection"), () -> {
                     focusedRecordId = 0;
                     refresh();
                 }) : new Label());
@@ -437,7 +446,7 @@ public final class HistoryScreen implements Refreshable {
     private Node observationDetail(Child child, HistoryEntry entry) {
         Observation observation = context.repo().observations().find(entry.recordId());
         if (observation == null) {
-            return Ui.meta("This observation has since been deleted.");
+            return Ui.meta(Messages.get("history.observationDeleted"));
         }
         VBox box = new VBox(10);
         VBox text = new VBox(Ui.textBlock(observation.getBody()));
@@ -447,27 +456,30 @@ public final class HistoryScreen implements Refreshable {
 
         box.getChildren().add(Ui.row(
                 Ui.meta(Text.joinNonBlank(" \u00b7 ", observation.getContext(),
-                        observation.getAuthor().isEmpty() ? "" : "by " + observation.getAuthor(),
-                        observation.isConfidential() ? "confidential" : "")),
+                        observation.getAuthor().isEmpty() ? ""
+                                : Messages.get("history.recordedBy", observation.getAuthor()),
+                        observation.isConfidential()
+                                ? Messages.get("observations.confidential") : "")),
                 Ui.spacer(),
-                Ui.button("Edit observation", () -> shell.showAnd("observations", target -> {
-                    if (target instanceof ObservationsScreen observations) {
-                        observations.openNewForm(null);
-                    }
-                }))));
+                Ui.button(Messages.get("observations.editTitle"),
+                        () -> shell.showAnd("observations", target -> {
+                            if (target instanceof ObservationsScreen observations) {
+                                observations.openNewForm(null);
+                            }
+                        }))));
 
         PhotosPanel photos = new PhotosPanel(context, Photo.OwnerType.OBSERVATION,
                 observation.getId(), child.getId(), shell.window(),
                 photo -> PhotosPanel.showPhotoViewer(photo, shell.window()),
                 context::notifyDataChanged);
-        box.getChildren().add(Ui.card("Photos", photos.node()));
+        box.getChildren().add(Ui.card(Messages.get("common.photos"), photos.node()));
         return box;
     }
 
     private Node interviewDetail(Child child, HistoryEntry entry) {
         Interview interview = context.repo().interviews().find(entry.recordId());
         if (interview == null) {
-            return Ui.meta("This interview note has since been deleted.");
+            return Ui.meta(Messages.get("history.interviewDeleted"));
         }
         VBox box = new VBox(10);
         VBox text = new VBox(Ui.textBlock(entry.detail()));
@@ -479,12 +491,14 @@ public final class HistoryScreen implements Refreshable {
             HBox banner = new HBox(10);
             banner.getStyleClass().add(interview.isFollowUpDue() ? "warning-banner" : "info-banner");
             banner.setAlignment(Pos.CENTER_LEFT);
-            Label label = new Label("Follow-up: " + interview.getFollowUp()
-                    + (Text.isBlank(interview.getFollowUpDate()) ? ""
-                    : "  (due " + Dates.display(interview.getFollowUpDate()) + ")"));
+            String due = Text.isBlank(interview.getFollowUpDate()) ? ""
+                    : "  (" + Messages.get("interviews.followUp.due",
+                            Dates.display(interview.getFollowUpDate())) + ")";
+            Label label = new Label(Messages.get("history.followUp",
+                    interview.getFollowUp() + due));
             label.setWrapText(true);
             HBox.setHgrow(label, Priority.ALWAYS);
-            banner.getChildren().addAll(label, Ui.button("Mark as done", () -> {
+            banner.getChildren().addAll(label, Ui.button(Messages.get("history.markDone"), () -> {
                 context.repo().interviews().setFollowUpDone(interview.getId(), true);
                 context.notifyDataChanged();
             }));
@@ -495,7 +509,7 @@ public final class HistoryScreen implements Refreshable {
                 interview.getId(), child.getId(), shell.window(),
                 photo -> PhotosPanel.showPhotoViewer(photo, shell.window()),
                 context::notifyDataChanged);
-        box.getChildren().add(Ui.card("Photos", photos.node()));
+        box.getChildren().add(Ui.card(Messages.get("common.photos"), photos.node()));
         return box;
     }
 
@@ -504,17 +518,17 @@ public final class HistoryScreen implements Refreshable {
         LocalDate date = Dates.fromIso(entry.date());
         var record = date == null ? null : context.repo().attendanceFor(child.getId(), date);
         if (record == null) {
-            box.getChildren().add(Ui.meta("No attendance record found for this day."));
+            box.getChildren().add(Ui.meta(Messages.get("history.noAttendance")));
             return box;
         }
         box.getChildren().addAll(
-                Ui.keyValue("Status", record.statusEnum().label()),
-                Ui.keyValue("Reason", record.getReason()),
-                Ui.keyValue("Note", record.getNote()),
-                Ui.keyValue("Arrival", record.getArrivalTime()),
-                Ui.keyValue("Departure", record.getDepartureTime()),
-                Ui.keyValue("Recorded", record.getRecordedAt()));
-        box.getChildren().add(Ui.button("Open the register for this day", () -> shell.showAnd(
+                Ui.keyValue(Messages.get("history.status"), record.statusEnum().label()),
+                Ui.keyValue(Messages.get("common.reason"), record.getReason()),
+                Ui.keyValue(Messages.get("common.note"), record.getNote()),
+                Ui.keyValue(Messages.get("history.arrival"), record.getArrivalTime()),
+                Ui.keyValue(Messages.get("history.departure"), record.getDepartureTime()),
+                Ui.keyValue(Messages.get("history.recorded"), record.getRecordedAt()));
+        box.getChildren().add(Ui.button(Messages.get("history.openRegister"), () -> shell.showAnd(
                 "attendance", target -> {
                     if (target instanceof AttendanceScreen attendance) {
                         attendance.goToDate(date);
@@ -530,10 +544,9 @@ public final class HistoryScreen implements Refreshable {
         text.getStyleClass().add("detail-pane");
         text.setPadding(new Insets(12, 14, 12, 14));
         box.getChildren().add(text);
-        box.getChildren().add(Ui.meta("Activity plans belong to the whole class, so they appear in "
-                + "every child's history for the day. Each child's own participation is recorded as "
-                + "an observation."));
-        box.getChildren().add(Ui.button("Open the weekly plan", () -> shell.show("plans")));
+        box.getChildren().add(Ui.meta(Messages.get("history.planNote")));
+        box.getChildren().add(Ui.button(Messages.get("history.openWeeklyPlan"),
+                () -> shell.show("plans")));
         return box;
     }
 

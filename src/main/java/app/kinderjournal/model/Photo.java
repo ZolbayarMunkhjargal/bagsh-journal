@@ -29,14 +29,9 @@ public class Photo {
             return id;
         }
 
+        /** The label in the language currently selected. */
         public String label() {
-            return switch (this) {
-                case CHILD -> "Child profile";
-                case OBSERVATION -> "Observation";
-                case INTERVIEW -> "Interview note";
-                case PLAN -> "Lesson plan";
-                case GROUP -> "Class";
-            };
+            return app.kinderjournal.i18n.Messages.get("choice.owner." + id);
         }
 
         public static OwnerType fromId(String id) {

@@ -228,7 +228,8 @@ public class Child {
             return "";
         }
         String age = ageText();
-        return "Born " + Dates.display(birthDate) + (age.isEmpty() ? "" : " (" + age + ")");
+        return app.kinderjournal.i18n.Messages.get("child.born", Dates.display(birthDate))
+                + (age.isEmpty() ? "" : " (" + age + ")");
     }
 
     /** Two initials for the avatar placeholder. */

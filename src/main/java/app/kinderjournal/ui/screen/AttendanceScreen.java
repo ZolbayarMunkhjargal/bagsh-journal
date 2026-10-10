@@ -2,6 +2,7 @@ package app.kinderjournal.ui.screen;
 
 import app.kinderjournal.db.AttendanceDao;
 import app.kinderjournal.db.Repository;
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.Attendance;
 import app.kinderjournal.model.Child;
 import app.kinderjournal.model.Choices;
@@ -34,11 +35,9 @@ import javafx.scene.layout.VBox;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -92,12 +91,12 @@ public final class AttendanceScreen implements Refreshable {
 
     @Override
     public String title() {
-        return "Attendance";
+        return Messages.get("attendance.title");
     }
 
     @Override
     public String subtitle() {
-        return "Mark each child present, absent, late or excused. Past days can be corrected at any time.";
+        return Messages.get("attendance.subtitle");
     }
 
     @Override
@@ -150,18 +149,19 @@ public final class AttendanceScreen implements Refreshable {
         HBox modes = new HBox();
         modes.getStyleClass().add("segmented");
         modes.getChildren().addAll(
-                modeButton("Day", View.DAY, modeGroup),
-                modeButton("Calendar", View.CALENDAR, modeGroup),
-                modeButton("Summary", View.SUMMARY, modeGroup));
+                modeButton(Messages.get("attendance.view.day"), View.DAY, modeGroup),
+                modeButton(Messages.get("attendance.view.calendar"), View.CALENDAR, modeGroup),
+                modeButton(Messages.get("attendance.view.summary"), View.SUMMARY, modeGroup));
 
-        line.getChildren().addAll(Ui.fieldLabel("Class"), groupSelector, modes, Ui.spacer());
+        line.getChildren().addAll(Ui.fieldLabel(Messages.get("classPicker.label")), groupSelector,
+                modes, Ui.spacer());
 
         if (view == View.DAY) {
             line.getChildren().addAll(
                     Ui.button("\u2039", () -> goToDate(date.minusDays(1))),
                     datePicker,
                     Ui.button("\u203a", () -> goToDate(date.plusDays(1))),
-                    Ui.button("Today", () -> goToDate(LocalDate.now())));
+                    Ui.button(Messages.get("common.today"), () -> goToDate(LocalDate.now())));
         }
         box.getChildren().add(line);
 
@@ -170,16 +170,16 @@ public final class AttendanceScreen implements Refreshable {
             HBox actions = new HBox(10);
             actions.setAlignment(Pos.CENTER_LEFT);
             actions.getChildren().addAll(
-                    Ui.primaryButton("Save register", this::save),
-                    Ui.button("Mark all present", this::markAllPresent),
-                    Ui.button("Print this sheet", this::printSheet),
+                    Ui.primaryButton(Messages.get("button.saveRegister"), this::save),
+                    Ui.button(Messages.get("button.markAllPresent"), this::markAllPresent),
+                    Ui.button(Messages.get("button.printSheet"), this::printSheet),
                     Ui.spacer(),
                     statusLine);
             box.getChildren().add(actions);
         }
 
         if (context.currentGroup() == null) {
-            box.getChildren().add(Ui.meta("Create a class first, then take attendance for it."));
+            box.getChildren().add(Ui.meta(Messages.get("attendance.noClass.body")));
         }
         return box;
     }
@@ -208,8 +208,8 @@ public final class AttendanceScreen implements Refreshable {
         Group group = context.currentGroup();
         VBox box = new VBox(12);
         if (group == null) {
-            box.getChildren().add(Ui.emptyState("No class selected",
-                    "Pick or create a class to take attendance.", null));
+            box.getChildren().add(Ui.emptyState(Messages.get("attendance.noClass.title"),
+                    Messages.get("attendance.noClass.body"), null));
             return box;
         }
 
@@ -217,19 +217,21 @@ public final class AttendanceScreen implements Refreshable {
             HBox banner = new HBox(10);
             banner.getStyleClass().add("info-banner");
             banner.setAlignment(Pos.CENTER_LEFT);
-            Label label = new Label("You are editing " + Dates.displayLong(Dates.toIso(date))
-                    + ", not today. Changes are saved to that day.");
+            Label label = new Label(Messages.get("attendance.editingOtherDay",
+                    Dates.displayLong(Dates.toIso(date))));
             HBox.setHgrow(label, Priority.ALWAYS);
-            banner.getChildren().addAll(label, Ui.button("Back to today",
+            banner.getChildren().addAll(label, Ui.button(Messages.get("button.backToToday"),
                     () -> goToDate(LocalDate.now())));
             box.getChildren().add(banner);
         }
 
         List<Repository.RegisterRow> register = context.repo().register(group.getId(), date);
         if (register.isEmpty()) {
-            box.getChildren().add(Ui.emptyState("No children in " + group.getName(),
-                    "Add the children in this class, then their names will appear here each day.",
-                    Ui.primaryButton("Add a child", () -> shell.show("children"))));
+            box.getChildren().add(Ui.emptyState(
+                    Messages.get("attendance.noChildren.title", group.getName()),
+                    Messages.get("attendance.noChildren.body"),
+                    Ui.primaryButton(Messages.get("attendance.noChildren.action"),
+                            () -> shell.show("children"))));
             return box;
         }
 
@@ -257,7 +259,12 @@ public final class AttendanceScreen implements Refreshable {
         GridPane grid = new GridPane();
         grid.setPadding(new Insets(6, 12, 6, 12));
         applyColumnConstraints(grid);
-        String[] titles = {"#", "Child", "Mark", "Reason / note", "In / out"};
+        String[] titles = {
+                Messages.get("attendance.column.number"),
+                Messages.get("attendance.column.child"),
+                Messages.get("attendance.column.mark"),
+                Messages.get("attendance.column.reason"),
+                Messages.get("attendance.column.times")};
         for (int i = 0; i < titles.length; i++) {
             Label label = new Label(titles[i]);
             label.getStyleClass().add("field-label");
@@ -297,12 +304,14 @@ public final class AttendanceScreen implements Refreshable {
 
         HBox tiles = new HBox(10);
         tiles.getChildren().addAll(
-                summaryChip(String.valueOf(present), "Present", "#1b5e20"),
-                summaryChip(String.valueOf(absent), "Absent", "#b71c1c"),
-                summaryChip(String.valueOf(late), "Late", "#e65100"),
-                summaryChip(String.valueOf(excused), "Excused", "#4527a0"),
-                summaryChip(rate < 0 ? "\u2013" : rate + "%", "Attending today", "#0f766e"),
-                summaryChip(String.valueOf(total), "On the register", "#37474f"));
+                summaryChip(String.valueOf(present), Messages.get("attendance.present"), "#1b5e20"),
+                summaryChip(String.valueOf(absent), Messages.get("attendance.absent"), "#b71c1c"),
+                summaryChip(String.valueOf(late), Messages.get("attendance.late"), "#e65100"),
+                summaryChip(String.valueOf(excused), Messages.get("attendance.excused"), "#4527a0"),
+                summaryChip(rate < 0 ? "\u2013" : rate + "%",
+                        Messages.get("attendance.attendingToday"), "#0f766e"),
+                summaryChip(String.valueOf(total), Messages.get("attendance.onRegister"),
+                        "#37474f"));
         return tiles;
     }
 
@@ -328,9 +337,11 @@ public final class AttendanceScreen implements Refreshable {
 
         private final Repository.RegisterRow data;
         private final ToggleGroup group = new ToggleGroup();
-        private final TextField reason = Ui.textField("", "e.g. unwell, appointment", 22);
-        private final TextField arrival = Ui.textField("", "08:30", 6);
-        private final TextField departure = Ui.textField("", "13:00", 6);
+        private final TextField reason =
+                Ui.textField("", Messages.get("attendance.reasonHint"), 22);
+        private final TextField arrival = Ui.textField("", Messages.get("attendance.arrivalHint"), 6);
+        private final TextField departure =
+                Ui.textField("", Messages.get("attendance.departureHint"), 6);
         private final Map<Choices.AttendanceStatus, ToggleButton> buttons = new LinkedHashMap<>();
 
         Row(Repository.RegisterRow data) {
@@ -423,7 +434,9 @@ public final class AttendanceScreen implements Refreshable {
         if (statusLine == null) {
             return;
         }
-        statusLine.setText(dirty ? "Unsaved changes" : "All changes saved");
+        statusLine.setText(dirty
+                ? Messages.get("attendance.unsavedChanges")
+                : Messages.get("attendance.allChangesSaved"));
         statusLine.setStyle(dirty
                 ? "-fx-text-fill: #b45309; -fx-font-weight: bold;"
                 : "-fx-text-fill: #64748b;");
@@ -451,7 +464,7 @@ public final class AttendanceScreen implements Refreshable {
             updateStatus();
             context.notifyDataChanged();
         } catch (RuntimeException ex) {
-            Ui.error("Could not save the register", ex);
+            Ui.error(Messages.get("attendance.error.save"), ex);
         }
     }
 
@@ -472,8 +485,8 @@ public final class AttendanceScreen implements Refreshable {
     private Node buildCalendarView() {
         Group group = context.currentGroup();
         if (group == null) {
-            return Ui.emptyState("No class selected", "Pick a class to see its attendance calendar.",
-                    null);
+            return Ui.emptyState(Messages.get("attendance.noClass.title"),
+                    Messages.get("attendance.noClass.calendarBody"), null);
         }
         YearMonth month = YearMonth.from(date);
         Map<String, AttendanceDao.Summary> byDate = context.repo().attendance()
@@ -487,7 +500,8 @@ public final class AttendanceScreen implements Refreshable {
             }
             int observations = context.repo().observations().countOn(day);
             if (observations > 0) {
-                CalendarMonth.addMarker(cell, observations + " obs", null, "#1565c0");
+                CalendarMonth.addMarker(cell, Messages.get("attendance.observations", observations),
+                        null, "#1565c0");
             }
         });
         calendar.onSelect(day -> {
@@ -500,10 +514,11 @@ public final class AttendanceScreen implements Refreshable {
             refresh();
         });
 
-        String monthName = month.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+        String monthName = Dates.monthName(month.getYear(), month.getMonthValue());
         VBox box = new VBox(12);
-        box.getChildren().add(Ui.cardWithHeader("Attendance in " + monthName + " " + month.getYear(),
-                Ui.meta("Click a day to open its register"), calendar.node()));
+        box.getChildren().add(Ui.cardWithHeader(
+                Messages.get("attendance.calendarTitle", monthName),
+                Ui.meta(Messages.get("attendance.calendarHint")), calendar.node()));
         box.getChildren().add(RecordList.attendanceLegend());
         return box;
     }
@@ -513,21 +528,22 @@ public final class AttendanceScreen implements Refreshable {
     private Node buildSummaryView() {
         Group group = context.currentGroup();
         if (group == null) {
-            return Ui.emptyState("No class selected", "Pick a class to see its attendance summary.",
-                    null);
+            return Ui.emptyState(Messages.get("attendance.noClass.title"),
+                    Messages.get("attendance.noClass.summaryBody"), null);
         }
 
         DatePicker fromPicker = Ui.datePicker(summaryFrom);
         DatePicker toPicker = Ui.datePicker(summaryTo);
         HBox controls = new HBox(10,
-                Ui.fieldLabel("From"), fromPicker, Ui.fieldLabel("To"), toPicker,
-                Ui.button("Update", () -> {
+                Ui.fieldLabel(Messages.get("common.from")), fromPicker,
+                Ui.fieldLabel(Messages.get("common.to")), toPicker,
+                Ui.button(Messages.get("common.update"), () -> {
                     summaryFrom = fromPicker.getValue();
                     summaryTo = toPicker.getValue();
                     refresh();
                 }),
                 Ui.spacer(),
-                Ui.button("Print summary", this::printSummary));
+                Ui.button(Messages.get("button.printSummary"), this::printSummary));
         controls.setAlignment(Pos.CENTER_LEFT);
 
         List<Child> children = context.repo().children().listByGroup(group.getId(), false);
@@ -537,23 +553,31 @@ public final class AttendanceScreen implements Refreshable {
                 .summaryForGroup(group.getId(), summaryFrom, summaryTo);
 
         VBox box = new VBox(12);
-        box.getChildren().add(Ui.card("Period",
+        box.getChildren().add(Ui.card(Messages.get("attendance.periodCard"),
                 controls,
-                Ui.meta("Records from " + Dates.display(Dates.toIso(summaryFrom))
-                        + " to " + Dates.display(Dates.toIso(summaryTo))
-                        + "  \u00b7  " + total.recorded() + " marks  \u00b7  "
-                        + total.rateText() + " attending")));
+                Ui.meta(Messages.get("attendance.periodLine",
+                        Dates.display(Dates.toIso(summaryFrom)),
+                        Dates.display(Dates.toIso(summaryTo)))
+                        + "  \u00b7  " + Messages.get("attendance.periodMarks", total.recorded())
+                        + "  \u00b7  " + Messages.get("attendance.periodRate", total.rateText()))));
 
         if (children.isEmpty()) {
-            box.getChildren().add(Ui.emptyState("No children in this class",
-                    "Add children to see per-child attendance totals.", null));
+            box.getChildren().add(Ui.emptyState(Messages.get("attendance.summary.empty"),
+                    Messages.get("attendance.summary.emptyBody"), null));
             return box;
         }
 
         GridPane table = new GridPane();
         table.setHgap(10);
         table.setVgap(4);
-        String[] titles = {"Child", "Present", "Late", "Absent", "Excused", "Recorded", "Rate"};
+        String[] titles = {
+                Messages.get("attendance.column.child"),
+                Messages.get("attendance.present"),
+                Messages.get("attendance.late"),
+                Messages.get("attendance.absent"),
+                Messages.get("attendance.excused"),
+                Messages.get("attendance.column.recorded"),
+                Messages.get("attendance.column.rate")};
         double[] widths = {34, 11, 11, 11, 11, 11, 11};
         for (int i = 0; i < titles.length; i++) {
             ColumnConstraints column = new ColumnConstraints();
@@ -577,7 +601,7 @@ public final class AttendanceScreen implements Refreshable {
             table.add(rateCell(summary), 6, row);
             row++;
         }
-        table.add(boldCell("Class total"), 0, row);
+        table.add(boldCell(Messages.get("attendance.classTotal")), 0, row);
         table.add(numberCell(total.present()), 1, row);
         table.add(numberCell(total.late()), 2, row);
         table.add(numberCell(total.absent()), 3, row);
@@ -585,7 +609,7 @@ public final class AttendanceScreen implements Refreshable {
         table.add(numberCell(total.recorded()), 5, row);
         table.add(rateCell(total), 6, row);
 
-        box.getChildren().add(Ui.card("Per-child totals", table));
+        box.getChildren().add(Ui.card(Messages.get("attendance.perChild"), table));
         return box;
     }
 

@@ -1,5 +1,6 @@
 package app.kinderjournal.ui;
 
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.Photo;
 import app.kinderjournal.util.AppPaths;
 import app.kinderjournal.util.Text;
@@ -80,14 +81,14 @@ public final class PhotosPanel {
         HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER_LEFT);
         actions.getChildren().addAll(
-                Ui.button("Add photos\u2026", this::addPhotos),
-                Ui.meta(photos.size() == 1 ? "1 photo" : photos.size() + " photos"));
+                Ui.button(Messages.get("photos.add"), this::addPhotos),
+                Ui.meta(photos.size() == 1 ? Messages.get("photos.countOne")
+                        : Messages.get("photos.count", photos.size())));
         root.getChildren().add(actions);
 
         if (photos.isEmpty()) {
-            root.getChildren().add(Ui.emptyState("No photos attached",
-                    "Add pictures from this computer. They are copied into the local data folder "
-                            + "and are never uploaded anywhere.",
+            root.getChildren().add(Ui.emptyState(Messages.get("photos.noPhotos"),
+                    Messages.get("photos.noPhotosBody"),
                     null));
             return;
         }
@@ -109,11 +110,8 @@ public final class PhotosPanel {
             warning.getStyleClass().add("warning-banner");
             warning.setAlignment(Pos.CENTER_LEFT);
             warning.getChildren().add(new Label(missing == 1
-                    ? "One attached image file is missing from the photos folder. It may have been "
-                      + "moved or deleted outside the app. You can re-attach a replacement or remove "
-                      + "the entry."
-                    : missing + " attached image files are missing from the photos folder. You can "
-                      + "re-attach replacements or remove the entries."));
+                    ? Messages.get("photos.missingWarningOne")
+                    : Messages.get("photos.missingWarningMany", missing)));
             root.getChildren().add(warning);
         }
     }
@@ -126,7 +124,7 @@ public final class PhotosPanel {
 
         Image image = Ui.loadImage(photo.getFile(), TILE_WIDTH - 16);
         if (image == null) {
-            Label missing = new Label("Image file missing");
+            Label missing = new Label(Messages.get("photos.missing"));
             missing.getStyleClass().add("photo-missing");
             missing.setPrefSize(TILE_WIDTH - 16, THUMB_HEIGHT);
             missing.setAlignment(Pos.CENTER);
@@ -146,35 +144,38 @@ public final class PhotosPanel {
                 view.setCursor(javafx.scene.Cursor.HAND);
                 view.setOnMouseClicked(event -> onOpen.accept(photo));
                 javafx.scene.control.Tooltip.install(view,
-                        new javafx.scene.control.Tooltip("Open this photo full size"));
+                        new javafx.scene.control.Tooltip(Messages.get("photos.openFull")));
             }
             tile.getChildren().add(view);
         }
 
-        Label caption = new Label(Text.isBlank(photo.getCaption()) ? "(no caption)" : photo.getCaption());
+        Label caption = new Label(Text.isBlank(photo.getCaption()) ? Messages.get("photos.noCaption")
+                : photo.getCaption());
         caption.getStyleClass().add(Text.isBlank(photo.getCaption()) ? "field-empty" : "meta");
         caption.setWrapText(true);
         caption.setMaxWidth(TILE_WIDTH - 16);
         tile.getChildren().add(caption);
 
         Label size = new Label(Text.joinNonBlank(" \u00b7 ", photo.sizeText(),
-                photo.getAddedAt().isEmpty() ? "" : "added " + photo.getAddedAt().substring(0,
-                        Math.min(10, photo.getAddedAt().length()))));
+                photo.getAddedAt().isEmpty() ? ""
+                        : Messages.get("photos.addedOn", photo.getAddedAt().substring(0,
+                                Math.min(10, photo.getAddedAt().length())))));
         size.getStyleClass().add("stat-hint");
         tile.getChildren().add(size);
 
         HBox buttons = new HBox(2,
-                Ui.linkButton("Caption", () -> editCaption(photo)),
+                Ui.linkButton(Messages.get("photos.caption"), () -> editCaption(photo)),
                 photo.fileExists()
-                        ? Ui.linkButton("Replace", () -> replace(photo))
-                        : Ui.linkButton("Re-attach", () -> replace(photo)),
-                Ui.linkButton("Remove", () -> remove(photo)));
+                        ? Ui.linkButton(Messages.get("photos.replace"), () -> replace(photo))
+                        : Ui.linkButton(Messages.get("photos.reattach"), () -> replace(photo)),
+                Ui.linkButton(Messages.get("photos.remove"), () -> remove(photo)));
         tile.getChildren().add(buttons);
         return tile;
     }
 
     private void editCaption(Photo photo) {
-        String value = Ui.prompt("Photo caption", "Caption", photo.getCaption()).orElse(null);
+        String value = Ui.prompt(Messages.get("children.photoCaption"),
+                Messages.get("children.photoCaptionLabel"), photo.getCaption()).orElse(null);
         if (value == null) {
             return;
         }
@@ -188,24 +189,21 @@ public final class PhotosPanel {
     // ------------------------------------------------------------------ actions
 
     private void addPhotos() {
-        List<File> files = chooseImages("Add photos");
+        List<File> files = chooseImages(Messages.get("photos.addTitle"), "photos.fileFilter");
         if (files == null || files.isEmpty()) {
             return;
         }
         String caption = "";
         if (files.size() == 1) {
-            String value = Ui.prompt("Photo caption", "Describe the photo (optional)", "")
-                    .orElse(null);
+            String value = Ui.prompt(Messages.get("children.photoCaption"),
+                    Messages.get("photos.captionOptional"), "").orElse(null);
             if (value == null) {
                 return;
             }
             caption = value;
-        } else {
-            if (!Ui.confirm("Add " + files.size() + " photos?",
-                    "They will be attached to this record. You can add a caption to each one "
-                            + "afterwards.", "Add them")) {
-                return;
-            }
+        } else if (!Ui.confirm(Messages.get("photos.addMany", files.size()),
+                Messages.get("photos.addManyBody"), Messages.get("photos.addManyAction"))) {
+            return;
         }
         int added = 0;
         List<String> problems = new ArrayList<>();
@@ -223,16 +221,17 @@ public final class PhotosPanel {
             onChanged.run();
         }
         if (!problems.isEmpty()) {
-            Ui.error("Some photos could not be attached",
-                    "These files could not be copied: " + String.join(", ", problems));
+            Ui.error(Messages.get("photos.addFailed"),
+                    Messages.get("photos.addFailedBody", String.join(", ", problems)));
         } else if (added > 0) {
-            Ui.info("Photos added", added == 1 ? "The photo was attached."
-                    : added + " photos were attached.");
+            Ui.info(Messages.get("photos.addedTitle"), added == 1 ? Messages.get("photos.addedOne")
+                    : Messages.get("photos.addedMany", added));
         }
     }
 
     private void replace(Photo photo) {
-        List<File> files = chooseImages("Choose a replacement image");
+        List<File> files = chooseImages(Messages.get("photos.chooseReplacement"),
+                "photos.fileFilter");
         if (files == null || files.isEmpty()) {
             return;
         }
@@ -246,14 +245,13 @@ public final class PhotosPanel {
                 onChanged.run();
             }
         } catch (Exception ex) {
-            Ui.error("Could not replace this photo", ex);
+            Ui.error(Messages.get("photos.couldNotReplace"), ex);
         }
     }
 
     private void remove(Photo photo) {
-        if (!Ui.confirmDestructive("Remove this photo?",
-                "The picture is deleted from the local photos folder. This cannot be undone.",
-                "Remove photo")) {
+        if (!Ui.confirmDestructive(Messages.get("photos.removeTitle"),
+                Messages.get("photos.removeBody"), Messages.get("photos.removeConfirm"))) {
             return;
         }
         context.repo().photos().delete(photo.getId());
@@ -263,10 +261,10 @@ public final class PhotosPanel {
         }
     }
 
-    private List<File> chooseImages(String title) {
+    private List<File> chooseImages(String title, String filterKey) {
         FileChooser chooser = new FileChooser();
         chooser.setTitle(title);
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Images",
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Messages.get(filterKey),
                 "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.webp"));
         return chooser.showOpenMultipleDialog(owner);
     }
@@ -283,7 +281,8 @@ public final class PhotosPanel {
 
         javafx.stage.Stage window = new javafx.stage.Stage();
         window.initOwner(owner);
-        window.setTitle(Text.isBlank(photo.getCaption()) ? "Photo" : photo.getCaption());
+        window.setTitle(Text.isBlank(photo.getCaption()) ? Messages.get("common.photo")
+                : photo.getCaption());
 
         VBox box = new VBox(10);
         box.setPadding(new Insets(14));
@@ -291,7 +290,8 @@ public final class PhotosPanel {
         box.setStyle("-fx-background-color: #1f2933;");
 
         if (image == null) {
-            Label missing = new Label("This image file is missing.\n\nExpected at:\n" + file);
+            Label missing = new Label(Messages.get("photos.thisFileMissing")
+                    + "\n\n" + file);
             missing.setStyle("-fx-text-fill: #ffffff;");
             missing.setWrapText(true);
             box.getChildren().add(missing);
@@ -307,7 +307,7 @@ public final class PhotosPanel {
             caption.setWrapText(true);
             box.getChildren().add(caption);
         }
-        box.getChildren().add(Ui.meta("Stored locally: " + file));
+        box.getChildren().add(Ui.meta(Messages.get("photos.storedLocally", file)));
 
         javafx.scene.Scene scene = new javafx.scene.Scene(box, Color.web("#1f2933"));
         scene.getStylesheets().addAll(Styles.stylesheet());

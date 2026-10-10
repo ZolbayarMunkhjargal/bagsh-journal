@@ -41,6 +41,7 @@ point. Photographs are copied into the program's own folder on the same disk.
 | **Child history** | Everything recorded about one child merged into a single timeline, newest first, with filters for period and record type. |
 | **Advanced search** | One search across observations, interview notes, activity descriptions and child profiles, with combined filters for class, child, date range, category and record type. |
 | **Print & reports** | Eleven document types, previewed in the program and printed through the Windows print dialog, which also saves to PDF. |
+| **English and Mongolian** | The whole interface and every printed report can be switched between English and Mongolian with one button, and the choice is remembered. |
 | **Data & backup** | One-file backups of the database and every photo, restore with a safety copy taken first, a health check, and a list of any photos whose file has gone missing. |
 
 The program deliberately **does not** draw conclusions about a child. It organises
@@ -176,10 +177,67 @@ child and a snippet with the match highlighted.
 include, see how many records it will contain, then preview and print.
 
 **Data & backup** - where the data is, how big it is, backup and restore, a
-health check, and the teacher's name for report headings.
+health check, and the teacher's name for report headings. It also holds a
+language selector.
 
 Keyboard shortcuts: `Ctrl+1`..`Ctrl+8` for the record screens, `Ctrl+F` search,
 `Ctrl+P` reports, `Ctrl+R` refresh, `Ctrl+D` dashboard.
+
+---
+
+## Language
+
+The interface is available in **English** and **Mongolian** (Cyrillic).
+
+There is a language button at the right-hand end of the status bar. It shows the
+language it will switch *to*, written in that language's own script - so
+"Монгол" when the interface is English, and "English" when it is Mongolian.
+Pressing it rebuilds the whole window, including the printed reports, and the
+choice is stored in the database so the next start comes up in the same language.
+The Data & backup screen has a language selector too.
+
+A few details worth knowing:
+
+- **Month and weekday names are supplied by the program.** The JDK ships no
+  Mongolian locale data, so a standard date formatter silently falls back to
+  English. `Dates` therefore carries the Mongolian names itself.
+- **Attendance short codes are translated too** - the register buttons read
+  И / Х / Т / Ч rather than P / L / A / E.
+- **The teacher's own words are never translated.** Notes, reasons, plan titles,
+  child names and class names are stored exactly as typed. Only the interface
+  around them changes language.
+- **Reports are titled in the chosen language**, and the `lang` attribute of the
+  generated HTML follows it, so a browser hyphenates and spaces the text
+  correctly.
+
+### How the text is organised
+
+| File | Purpose |
+| --- | --- |
+| `src/main/resources/app/kinderjournal/i18n/messages_en.properties` | The master list. Every key the interface uses. |
+| `src/main/resources/app/kinderjournal/i18n/messages_mn.properties` | The Mongolian translation. |
+| `src/main/java/app/kinderjournal/i18n/Messages.java` | Looks text up, substitutes `{0}` placeholders, and notifies the window when the language changes. |
+| `src/main/java/app/kinderjournal/i18n/Lang.java` | The languages themselves. |
+| `src/main/java/app/kinderjournal/util/Dates.java` | Date, month and weekday formatting per language. |
+
+Text lives in plain `.properties` files with `#` comments, so it can be corrected
+without touching Java. A missing translation falls back to English rather than
+showing a blank label, which means a partial translation still leaves a usable
+program - but a key missing from *English* is a mistake, and the tests fail on it.
+
+### Adding or correcting a translation
+
+1. Add or edit the line in both `.properties` files, keeping any `{0}`
+   placeholders. Do not translate the placeholder itself.
+2. Run `tools\test.ps1`. It reports how complete each language is, refuses an
+   English key that the interface asks for but the file does not define, and
+   fails if a translation drops or renumbers a placeholder - which would
+   otherwise print a stray `{0}` on screen.
+
+To add a third language, add a constant to `Lang`, copy
+`messages_en.properties` to `messages_<code>.properties`, and translate. Nothing
+else needs to change; screens build their labels from the catalogue, so the new
+language appears in the toggle automatically.
 
 ---
 
@@ -337,8 +395,13 @@ run.bat --version                   print the version and data folder
 run.bat --seed-demo                 fill the data folder with sample data
 run.bat --export-reports <folder>   write every report type as HTML
 run.bat --ui-test                   build every screen and run the interface checks
+run.bat --show mn                   open the window on sample data, in Mongolian
 run.bat --data-dir <folder>         use an alternative data folder
 ```
+
+`--show <language>` is for looking at the interface rather than asserting about
+it: it opens on a full set of sample records and writes a child-history report per
+language, which is how the printed output is compared.
 
 The same options work on the packaged executable, and
 `KINDERJOURNAL_DATA_DIR` can be set as an environment variable instead of passing

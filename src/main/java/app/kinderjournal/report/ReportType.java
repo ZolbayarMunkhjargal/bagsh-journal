@@ -1,58 +1,55 @@
 package app.kinderjournal.report;
 
+import app.kinderjournal.i18n.Messages;
+
 /**
  * The document types the report builder can produce.
  *
- * <p>The constructor arguments are (label, description, defaultLandscape, needsChild).
- * A type with {@code needsChild} true is about one child, so the report screen asks for
- * a child before it will generate anything; the others cover a whole class.
+ * <p>The constructor arguments are (key, defaultLandscape, needsChild). The name
+ * and the one-line description are looked up per language through
+ * {@link Messages}, so a printed report is titled in the teacher's language.
+ *
+ * <p>A type with {@code needsChild} true is about one child, so the report screen
+ * asks for a child before it will generate anything; the others cover a whole
+ * class.
  */
 public enum ReportType {
 
-    ATTENDANCE_DAY("Daily attendance sheet",
-            "Every child in the class with their mark for one day, ready to sign and file.",
-            false, false),
-    ATTENDANCE_SUMMARY("Attendance summary",
-            "Attendance totals per child for a date range, with class totals.", false, false),
-    ATTENDANCE_MONTH("Monthly attendance grid",
-            "A day-by-day grid of marks for the whole month.", true, false),
-    CHILD_PROFILE("Child profile sheet",
-            "The child's details, contacts and notes, for the class file.", false, true),
-    CHILD_OBSERVATIONS("Observation report",
-            "The child's observations for a period, grouped by developmental area.", false, true),
-    CHILD_HISTORY("Child history report",
-            "Everything recorded about one child in a period, in date order.", false, true),
-    INTERVIEW_SUMMARY("Interview summary",
-            "Parent and child interviews, or one child's, with conclusions and follow-ups.",
-            false, false),
-    DAILY_PLAN("Daily activity plan",
-            "What is planned for one day, with objectives, sequence and materials.", false, false),
-    WEEKLY_PLAN("Weekly activity plan",
-            "The week at a glance, one column per day.", true, false),
-    CLASS_PERIOD("Class report for a period",
-            "Attendance, observations and interviews for a whole class over a date range.",
-            false, false),
-    SEARCH_RESULTS("Search results",
-            "The records matching a search, listed with their dates and content.", false, false);
+    ATTENDANCE_DAY("ATTENDANCE_DAY", false, false),
+    ATTENDANCE_SUMMARY("ATTENDANCE_SUMMARY", false, false),
+    ATTENDANCE_MONTH("ATTENDANCE_MONTH", true, false),
+    CHILD_PROFILE("CHILD_PROFILE", false, true),
+    CHILD_OBSERVATIONS("CHILD_OBSERVATIONS", false, true),
+    CHILD_HISTORY("CHILD_HISTORY", false, true),
+    INTERVIEW_SUMMARY("INTERVIEW_SUMMARY", false, false),
+    DAILY_PLAN("DAILY_PLAN", false, false),
+    WEEKLY_PLAN("WEEKLY_PLAN", true, false),
+    CLASS_PERIOD("CLASS_PERIOD", false, false),
+    SEARCH_RESULTS("SEARCH_RESULTS", false, false);
 
-    private final String label;
-    private final String description;
+    private final String key;
     private final boolean defaultLandscape;
     private final boolean needsChild;
 
-    ReportType(String label, String description, boolean defaultLandscape, boolean needsChild) {
-        this.label = label;
-        this.description = description;
+    ReportType(String key, boolean defaultLandscape, boolean needsChild) {
+        this.key = key;
         this.defaultLandscape = defaultLandscape;
         this.needsChild = needsChild;
     }
 
-    public String label() {
-        return label;
+    /** The stable name of this report type. */
+    public String key() {
+        return key;
     }
 
+    /** The document's title in the selected language. */
+    public String label() {
+        return Messages.get("report." + key);
+    }
+
+    /** The one-line explanation shown in the report picker. */
     public String description() {
-        return description;
+        return Messages.get("report." + key + ".desc");
     }
 
     /** True when the document is wider than it is tall by default. */

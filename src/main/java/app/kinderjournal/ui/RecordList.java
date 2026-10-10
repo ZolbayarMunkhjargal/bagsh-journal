@@ -1,5 +1,6 @@
 package app.kinderjournal.ui;
 
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.HistoryEntry;
 import app.kinderjournal.model.SearchHit;
 import app.kinderjournal.util.Dates;
@@ -63,18 +64,18 @@ public final class RecordList {
             headline.getChildren().add(kind);
         }
         if (entry.photoCount() > 0) {
-            Label photos = Ui.pill("\u25a3 " + entry.photoCount(), "pill-count");
+            Label photos = Ui.pill(Messages.get("list.photoCount", entry.photoCount()), "pill-count");
             headline.getChildren().add(photos);
         }
         Region spacer = Ui.spacer();
         headline.getChildren().add(spacer);
 
         if (onEdit != null) {
-            headline.getChildren().add(Ui.iconButton("\u270e", "Edit this record",
+            headline.getChildren().add(Ui.iconButton("\u270e", Messages.get("list.edit"),
                     () -> onEdit.accept(entry)));
         }
         if (onDelete != null) {
-            headline.getChildren().add(Ui.iconButton("\u2715", "Delete this record",
+            headline.getChildren().add(Ui.iconButton("\u2715", Messages.get("list.delete"),
                     () -> onDelete.accept(entry)));
         }
 
@@ -103,7 +104,7 @@ public final class RecordList {
                 }
             });
             row.setCursor(javafx.scene.Cursor.HAND);
-            Tooltip.install(row, new Tooltip("Open the full record"));
+            Tooltip.install(row, new Tooltip(Messages.get("list.openRecord")));
         }
         return row;
     }
@@ -174,7 +175,8 @@ public final class RecordList {
             if (at > from) {
                 flow.getChildren().add(new javafx.scene.text.Text(value.substring(from, at)));
             }
-            javafx.scene.text.Text hit = new javafx.scene.text.Text(value.substring(at, at + keyword.length()));
+            javafx.scene.text.Text hit = new javafx.scene.text.Text(
+                    value.substring(at, at + keyword.length()));
             hit.setStyle("-fx-font-weight: bold; -fx-fill: #0b5f59;");
             flow.getChildren().add(hit);
             from = at + keyword.length();
@@ -221,10 +223,10 @@ public final class RecordList {
     /** A legend explaining the attendance colours, for registers and calendars. */
     public static Node attendanceLegend() {
         HBox box = new HBox(14,
-                Ui.legendDot("#1b5e20", "Present"),
-                Ui.legendDot("#b71c1c", "Absent"),
-                Ui.legendDot("#e65100", "Late"),
-                Ui.legendDot("#4527a0", "Excused"));
+                Ui.legendDot("#1b5e20", Messages.get("calendar.legend.present")),
+                Ui.legendDot("#b71c1c", Messages.get("calendar.legend.absent")),
+                Ui.legendDot("#e65100", Messages.get("calendar.legend.late")),
+                Ui.legendDot("#4527a0", Messages.get("calendar.legend.excused")));
         box.setAlignment(Pos.CENTER_LEFT);
         return box;
     }
@@ -246,10 +248,10 @@ public final class RecordList {
             return iso;
         }
         if (date.equals(LocalDate.now())) {
-            return "Today \u00b7 " + Dates.display(iso);
+            return Messages.get("list.dayHeadingToday", Dates.display(iso));
         }
         if (date.equals(LocalDate.now().minusDays(1))) {
-            return "Yesterday \u00b7 " + Dates.display(iso);
+            return Messages.get("list.dayHeadingYesterday", Dates.display(iso));
         }
         return Dates.displayLong(iso);
     }

@@ -21,19 +21,17 @@ public record HistoryEntry(
 
     /** The sort of record an entry came from. */
     public enum Kind {
-        ATTENDANCE("attendance", "Attendance", "#00695c"),
-        OBSERVATION("observation", "Observation", "#1565c0"),
-        INTERVIEW("interview", "Interview", "#6a1b9a"),
-        PLAN("plan", "Activity plan", "#ef6c00"),
-        NOTE("note", "Profile note", "#455a64");
+        ATTENDANCE("attendance", "#00695c"),
+        OBSERVATION("observation", "#1565c0"),
+        INTERVIEW("interview", "#6a1b9a"),
+        PLAN("plan", "#ef6c00"),
+        NOTE("note", "#455a64");
 
         private final String id;
-        private final String label;
         private final String colour;
 
-        Kind(String id, String label, String colour) {
+        Kind(String id, String colour) {
             this.id = id;
-            this.label = label;
             this.colour = colour;
         }
 
@@ -41,8 +39,9 @@ public record HistoryEntry(
             return id;
         }
 
+        /** The label in the language currently selected. */
         public String label() {
-            return label;
+            return app.kinderjournal.i18n.Messages.get("choice.kind." + id);
         }
 
         public String colour() {

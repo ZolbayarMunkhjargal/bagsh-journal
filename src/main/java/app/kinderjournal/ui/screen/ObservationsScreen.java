@@ -1,5 +1,6 @@
 package app.kinderjournal.ui.screen;
 
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.Child;
 import app.kinderjournal.model.Choices;
 import app.kinderjournal.model.Group;
@@ -67,12 +68,12 @@ public final class ObservationsScreen implements Refreshable {
 
     @Override
     public String title() {
-        return "Observations";
+        return Messages.get("observations.title");
     }
 
     @Override
     public String subtitle() {
-        return "Dated notes on development, participation and behaviour, with optional photos.";
+        return Messages.get("observations.subtitle");
     }
 
     @Override
@@ -86,19 +87,20 @@ public final class ObservationsScreen implements Refreshable {
         page.getChildren().add(buildHeader());
 
         if (context.currentGroup() == null) {
-            page.getChildren().add(Ui.emptyState("No class selected",
-                    "Pick or create a class, then observations can be written for its children.",
-                    Ui.primaryButton("Go to classes", () -> shell.show("classes"))));
+            page.getChildren().add(Ui.emptyState(Messages.get("observations.noClass.title"),
+                    Messages.get("observations.noClass.body"),
+                    Ui.primaryButton(Messages.get("observations.noClass.action"),
+                            () -> shell.show("classes"))));
             root.setContent(page);
             return;
         }
 
         List<Observation> observations = load();
         if (observations.isEmpty()) {
-            page.getChildren().add(Ui.emptyState("No observations match these filters",
-                    "Write a note about something a child did today - a new word, a kind gesture, "
-                            + "a skill they practised - or widen the filters above.",
-                    Ui.primaryButton("Add an observation", () -> openNewForm(filterChild))));
+            page.getChildren().add(Ui.emptyState(Messages.get("observations.empty.title"),
+                    Messages.get("observations.empty.body"),
+                    Ui.primaryButton(Messages.get("observations.add"),
+                            () -> openNewForm(filterChild))));
             page.getChildren().add(buildCategoryTiles());
             root.setContent(page);
             return;
@@ -139,9 +141,10 @@ public final class ObservationsScreen implements Refreshable {
         HBox line = new HBox(10);
         line.setAlignment(Pos.CENTER_LEFT);
         line.getChildren().addAll(
-                Ui.fieldLabel("Class"), MainShell.groupSelector(context),
+                Ui.fieldLabel(Messages.get("classPicker.label")), MainShell.groupSelector(context),
                 Ui.spacer(),
-                Ui.primaryButton("Add an observation", () -> openNewForm(filterChild)));
+                Ui.primaryButton(Messages.get("observations.add"),
+                        () -> openNewForm(filterChild)));
         box.getChildren().add(line);
 
         HBox filters = new HBox(10);
@@ -156,7 +159,7 @@ public final class ObservationsScreen implements Refreshable {
         childChoice.setConverter(new StringConverter<>() {
             @Override
             public String toString(Child child) {
-                return child == null ? "All children" : child.fullName();
+                return child == null ? Messages.get("common.allChildren") : child.fullName();
             }
 
             @Override
@@ -173,7 +176,7 @@ public final class ObservationsScreen implements Refreshable {
 
         ComboBox<String> categoryChoice = new ComboBox<>();
         Map<String, String> categories = new LinkedHashMap<>();
-        categories.put("all", "All categories");
+        categories.put("all", Messages.get("common.allObsCategories"));
         categories.putAll(Choices.observationLabelMap());
         categoryChoice.getItems().addAll(categories.keySet());
         categoryChoice.setConverter(new StringConverter<>() {
@@ -196,8 +199,8 @@ public final class ObservationsScreen implements Refreshable {
 
         DatePicker from = Ui.datePicker(filterFrom);
         DatePicker to = Ui.datePicker(filterTo);
-        from.setPromptText("From");
-        to.setPromptText("To");
+        from.setPromptText(Messages.get("common.from"));
+        to.setPromptText(Messages.get("common.to"));
         from.valueProperty().addListener((observable, previous, next) -> {
             filterFrom = next;
             refresh();
@@ -208,11 +211,11 @@ public final class ObservationsScreen implements Refreshable {
         });
 
         filters.getChildren().addAll(
-                Ui.fieldLabel("Child"), childChoice,
-                Ui.fieldLabel("Category"), categoryChoice,
-                Ui.fieldLabel("From"), from,
-                Ui.fieldLabel("To"), to,
-                Ui.button("Clear", () -> {
+                Ui.fieldLabel(Messages.get("common.child")), childChoice,
+                Ui.fieldLabel(Messages.get("common.category")), categoryChoice,
+                Ui.fieldLabel(Messages.get("common.from")), from,
+                Ui.fieldLabel(Messages.get("common.to")), to,
+                Ui.button(Messages.get("common.clear"), () -> {
                     filterChild = null;
                     filterCategory = "all";
                     filterFrom = null;
@@ -222,7 +225,7 @@ public final class ObservationsScreen implements Refreshable {
         box.getChildren().add(filters);
 
         if (filterFrom != null && filterTo != null && filterFrom.isAfter(filterTo)) {
-            box.getChildren().add(Ui.meta("The start of the range is after its end."));
+            box.getChildren().add(Ui.meta(Messages.get("attendance.error.rangeOrder")));
         }
         return box;
     }
@@ -265,13 +268,17 @@ public final class ObservationsScreen implements Refreshable {
     // -------------------------------------------------------------------- list
 
     private Node observationRow(Observation observation, boolean selected) {
+        int photoCount = observation.getPhotoCount();
         String subtitle = Text.joinNonBlank(" \u00b7 ",
                 Dates.display(observation.getDate()),
                 observation.getChildName(),
                 observation.getContext(),
-                observation.getPhotoCount() > 0 ? observation.getPhotoCount() + " photo(s)" : "");
+                photoCount > 0
+                        ? Messages.get(photoCount == 1 ? "count.photo" : "count.photos", photoCount)
+                        : "");
         return app.kinderjournal.ui.RecordList.selectableRow(null,
-                observation.headline().isEmpty() ? "(no text)" : observation.headline(),
+                observation.headline().isEmpty()
+                        ? Messages.get("observations.noText") : observation.headline(),
                 subtitle,
                 observation.categoryEnum().label(), selected, () -> {
                     selectedObservationId = observation.getId();
@@ -292,14 +299,15 @@ public final class ObservationsScreen implements Refreshable {
         }
         VBox titles = new VBox(2);
         Label title = new Label(observation.headline().isEmpty()
-                ? "Observation" : observation.headline());
+                ? Messages.get("observations.detailTitle") : observation.headline());
         title.getStyleClass().add("screen-title");
         title.setWrapText(true);
         Label meta = new Label(Text.joinNonBlank(" \u00b7 ",
                 observation.getChildName(),
                 Dates.displayLong(observation.getDate()),
                 observation.getContext(),
-                observation.getAuthor().isEmpty() ? "" : "by " + observation.getAuthor()));
+                observation.getAuthor().isEmpty()
+                        ? "" : Messages.get("history.recordedBy", observation.getAuthor())));
         meta.getStyleClass().add("meta");
         meta.setWrapText(true);
         titles.getChildren().addAll(title, meta);
@@ -311,11 +319,11 @@ public final class ObservationsScreen implements Refreshable {
         tags.getChildren().add(Ui.chipColoured(observation.categoryEnum().label(),
                 observation.categoryEnum().colour()));
         if (observation.isConfidential()) {
-            tags.getChildren().add(Ui.pill("Confidential", "pill-absent"));
+            tags.getChildren().add(Ui.pill(Messages.get("observations.confidential"), "pill-absent"));
         }
         tags.getChildren().addAll(Ui.spacer(),
-                Ui.button("Edit", () -> openEditForm(observation)),
-                Ui.dangerButton("Delete", () -> delete(observation)));
+                Ui.button(Messages.get("common.edit"), () -> openEditForm(observation)),
+                Ui.dangerButton(Messages.get("common.delete"), () -> delete(observation)));
         box.getChildren().add(tags);
 
         VBox text = new VBox(Ui.textBlock(observation.getBody()));
@@ -325,11 +333,11 @@ public final class ObservationsScreen implements Refreshable {
 
         if (child != null) {
             HBox childActions = new HBox(8,
-                    Ui.button("Open profile", () -> {
+                    Ui.button(Messages.get("button.openProfile"), () -> {
                         context.setCurrentChild(child);
                         shell.show("children");
                     }),
-                    Ui.button("See full history", () -> {
+                    Ui.button(Messages.get("observations.seeFullHistory"), () -> {
                         context.setCurrentChild(child);
                         shell.showAnd("history", target -> {
                             if (target instanceof HistoryScreen history) {
@@ -345,7 +353,7 @@ public final class ObservationsScreen implements Refreshable {
                 observation.getId(), observation.getChildId(), shell.window(),
                 photo -> PhotosPanel.showPhotoViewer(photo, shell.window()),
                 context::notifyDataChanged);
-        box.getChildren().add(Ui.card("Photos", photos.node()));
+        box.getChildren().add(Ui.card(Messages.get("common.photos"), photos.node()));
 
         return box;
     }
@@ -366,8 +374,8 @@ public final class ObservationsScreen implements Refreshable {
         Observation draft = creating ? new Observation() : existing;
         List<Child> children = context.repo().children().listByGroup(context.currentGroupId(), false);
         if (children.isEmpty() && creating) {
-            Ui.warn("No children in this class",
-                    "Add the child to a class first, then observations can be written about them.");
+            Ui.warn(Messages.get("observations.noChildren"),
+                    Messages.get("observations.noChildrenBody"));
             return;
         }
 
@@ -380,7 +388,8 @@ public final class ObservationsScreen implements Refreshable {
         Stage dialog = new Stage();
         dialog.initModality(Modality.WINDOW_MODAL);
         dialog.initOwner(shell.window());
-        dialog.setTitle(creating ? "New observation" : "Edit observation");
+        dialog.setTitle(creating
+                ? Messages.get("observations.newTitle") : Messages.get("observations.editTitle"));
 
         ComboBox<Child> childChoice = new ComboBox<>();
         childChoice.getItems().addAll(children);
@@ -428,15 +437,14 @@ public final class ObservationsScreen implements Refreshable {
         category.setPrefWidth(280);
 
         TextField title = Ui.textField(draft.getTitle(),
-                "Short headline, e.g. \"New words at circle time\"", 30);
+                Messages.get("observations.headlineHint"), 30);
         TextField contextField = Ui.textField(draft.getContext(),
-                "Where it happened, e.g. outdoor play", 24);
-        TextField author = Ui.textField(draft.getAuthor(), "Your name", 18);
+                Messages.get("observations.contextHint"), 24);
+        TextField author = Ui.textField(draft.getAuthor(), Messages.get("observations.authorHint"), 18);
         TextArea body = Ui.textArea(draft.getBody(), 9);
-        body.setPromptText("What did you notice? Describe what the child did or said, and the "
-                + "situation it happened in.");
+        body.setPromptText(Messages.get("observations.bodyHint"));
         javafx.scene.control.CheckBox confidential = new javafx.scene.control.CheckBox(
-                "Mark as confidential (kept out of shared reports)");
+                Messages.get("observations.markConfidential"));
         confidential.setSelected(draft.isConfidential());
 
         Label error = new Label();
@@ -445,18 +453,18 @@ public final class ObservationsScreen implements Refreshable {
         error.setManaged(false);
 
         GridPane grid = Ui.formGrid();
-        grid.add(Ui.field("Child", childChoice), 0, 0);
-        grid.add(Ui.field("Date", date), 1, 0);
-        grid.add(Ui.field("Category", category), 0, 1);
-        grid.add(Ui.field("Context", contextField), 1, 1);
-        grid.add(Ui.field("Headline (optional)", title), 0, 2, 2, 1);
-        grid.add(Ui.field("Observation", body), 0, 3, 2, 1);
-        grid.add(Ui.field("Recorded by", author), 0, 4);
+        grid.add(Ui.field(Messages.get("observations.field.child"), childChoice), 0, 0);
+        grid.add(Ui.field(Messages.get("observations.field.date"), date), 1, 0);
+        grid.add(Ui.field(Messages.get("observations.field.category"), category), 0, 1);
+        grid.add(Ui.field(Messages.get("observations.field.context"), contextField), 1, 1);
+        grid.add(Ui.field(Messages.get("observations.field.headline"), title), 0, 2, 2, 1);
+        grid.add(Ui.field(Messages.get("observations.field.body"), body), 0, 3, 2, 1);
+        grid.add(Ui.field(Messages.get("observations.field.author"), author), 0, 4);
         grid.add(confidential, 1, 4);
 
         Label photoHint = Ui.meta(creating
-                ? "Photos can be added once the observation has been saved."
-                : "Add or remove photos for this observation below.");
+                ? Messages.get("observations.photosNew")
+                : Messages.get("observations.photosEdit"));
         photoHint.setWrapText(true);
 
         VBox photoArea = new VBox(8);
@@ -468,22 +476,23 @@ public final class ObservationsScreen implements Refreshable {
             photoArea.getChildren().add(panel.node());
         }
 
-        VBox bodyBox = new VBox(12, grid, error, Ui.sectionTitle("Photos"), photoHint, photoArea);
+        VBox bodyBox = new VBox(12, grid, error, Ui.sectionTitle(Messages.get("common.photos")),
+                photoHint, photoArea);
         bodyBox.setPadding(new Insets(16, 18, 8, 18));
         bodyBox.setPrefWidth(660);
 
         Runnable save = () -> {
             Child chosen = childChoice.getValue();
             if (chosen == null) {
-                showFormError(error, "Please choose the child this observation is about.");
+                showFormError(error, Messages.get("observations.error.noChild"));
                 return;
             }
             if (date.getValue() == null) {
-                showFormError(error, "Please choose the date of the observation.");
+                showFormError(error, Messages.get("observations.error.noDate"));
                 return;
             }
             if (Text.isBlank(body.getText())) {
-                showFormError(error, "Please write what you observed.");
+                showFormError(error, Messages.get("observations.error.noBody"));
                 body.requestFocus();
                 return;
             }
@@ -504,12 +513,15 @@ public final class ObservationsScreen implements Refreshable {
                 context.notifyDataChanged();
                 dialog.close();
             } catch (RuntimeException ex) {
-                Ui.error("Could not save this observation", ex);
+                Ui.error(Messages.get("observations.error.save"), ex);
             }
         };
 
-        HBox buttons = new HBox(8, Ui.spacer(), Ui.button("Cancel", dialog::close),
-                Ui.primaryButton(creating ? "Save observation" : "Save changes", save));
+        HBox buttons = new HBox(8, Ui.spacer(), Ui.button(Messages.get("common.cancel"),
+                dialog::close),
+                Ui.primaryButton(creating
+                        ? Messages.get("observations.save.new")
+                        : Messages.get("observations.save.edit"), save));
         buttons.setPadding(new Insets(0, 18, 16, 18));
         buttons.setAlignment(Pos.CENTER_RIGHT);
 
@@ -525,9 +537,9 @@ public final class ObservationsScreen implements Refreshable {
     }
 
     private void delete(Observation observation) {
-        if (!Ui.confirmDestructive("Delete this observation?",
-                "The note and any photos attached to it will be removed. This cannot be undone.",
-                "Delete observation")) {
+        if (!Ui.confirmDestructive(Messages.get("observations.delete.title"),
+                Messages.get("observations.delete.body"),
+                Messages.get("observations.delete.confirm"))) {
             return;
         }
         try {
@@ -535,7 +547,7 @@ public final class ObservationsScreen implements Refreshable {
             selectedObservationId = 0;
             context.notifyDataChanged();
         } catch (RuntimeException ex) {
-            Ui.error("Could not delete this observation", ex);
+            Ui.error(Messages.get("observations.error.delete"), ex);
         }
     }
 

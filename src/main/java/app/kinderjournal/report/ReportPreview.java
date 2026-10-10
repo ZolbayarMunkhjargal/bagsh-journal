@@ -1,5 +1,6 @@
 package app.kinderjournal.report;
 
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.ui.Styles;
 import app.kinderjournal.ui.Ui;
 import app.kinderjournal.util.AppPaths;
@@ -41,7 +42,7 @@ public final class ReportPreview {
         Stage window = new Stage();
         window.initModality(Modality.WINDOW_MODAL);
         window.initOwner(owner);
-        window.setTitle("Preview \u2014 " + title);
+        window.setTitle(Messages.get("reports.previewTitle", title));
 
         VBox page = new VBox(10);
         page.setPadding(new Insets(22, 26, 22, 26));
@@ -52,19 +53,17 @@ public final class ReportPreview {
         ScrollPane scroller = Ui.scroll(page);
         scroller.setStyle("-fx-background-color: #e9edf1;");
 
-        Label hint = new Label("This is how the document will look. Long reports continue across "
-                + "pages and carry page numbers when printed. To keep a copy as a PDF, choose "
-                + "\"Microsoft Print to PDF\" in the print dialog.");
+        Label hint = new Label(Messages.get("reports.previewHint"));
         hint.setWrapText(true);
         hint.getStyleClass().add("meta");
 
         HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER_LEFT);
         actions.getChildren().addAll(
-                Ui.primaryButton("Print\u2026", () -> print(rendered)),
-                Ui.button("Save as a file\u2026", () -> save(rendered, window)),
+                Ui.primaryButton(Messages.get("reports.printAction"), () -> print(rendered)),
+                Ui.button(Messages.get("reports.saveAsFile"), () -> save(rendered, window)),
                 Ui.spacer(),
-                Ui.button("Close", window::close));
+                Ui.button(Messages.get("common.close"), window::close));
 
         VBox bottom = new VBox(8, hint, actions);
         bottom.setPadding(new Insets(12, 16, 14, 16));
@@ -90,29 +89,30 @@ public final class ReportPreview {
             Path file = writeTemporary(rendered);
             openExternally(file);
         } catch (IOException ex) {
-            Ui.error("Could not prepare the report for printing", ex);
+            Ui.error(Messages.get("reports.couldNotPrepare"), ex);
         }
     }
 
     private static void save(ReportRenderer.Rendered rendered, Window owner) {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Save report");
+        chooser.setTitle(Messages.get("reports.saveTitle"));
         chooser.setInitialFileName(fileName(rendered.title()));
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Web page", "*.html"));
+        chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter(Messages.get("reports.saveFilter"), "*.html"));
         java.io.File chosen = chooser.showSaveDialog(owner);
         if (chosen == null) {
             return;
         }
         try {
             Files.writeString(chosen.toPath(), rendered.html());
-            if (Ui.confirm("Report saved",
-                    "Saved to:\n" + chosen.getAbsolutePath()
-                            + "\n\nOpen it now so you can print it or save it as a PDF?",
-                    "Open it")) {
+            if (Ui.confirm(Messages.get("reports.saved"),
+                    Messages.get("reports.savedBody") + "\n" + chosen.getAbsolutePath()
+                            + "\n\n" + Messages.get("reports.openIt"),
+                    Messages.get("reports.openItAction"))) {
                 openExternally(chosen.toPath());
             }
         } catch (IOException ex) {
-            Ui.error("Could not save the report", ex);
+            Ui.error(Messages.get("reports.couldNotSave"), ex);
         }
     }
 
@@ -127,10 +127,9 @@ public final class ReportPreview {
         } catch (IOException | UnsupportedOperationException ex) {
             Ui.logError("Opening " + file, ex);
         }
-        Ui.info("Open this file to print it",
-                "Automatic opening is not available on this computer, so the report was saved to:"
-                        + "\n\n" + file.toAbsolutePath()
-                        + "\n\nOpen it in a browser and press Ctrl+P to print or save a PDF.");
+        Ui.info(Messages.get("reports.openManually"),
+                Messages.get("reports.openManuallyBody") + "\n\n" + file.toAbsolutePath()
+                        + "\n\n" + Messages.get("reports.openManuallyHow"));
     }
 
     /** Writes a generated report into the app's own reports folder. */

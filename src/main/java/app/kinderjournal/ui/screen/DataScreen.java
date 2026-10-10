@@ -1,6 +1,8 @@
 package app.kinderjournal.ui.screen;
 
 import app.kinderjournal.backup.BackupService;
+import app.kinderjournal.i18n.Lang;
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.Photo;
 import app.kinderjournal.ui.AppContext;
 import app.kinderjournal.ui.MainShell;
@@ -11,12 +13,14 @@ import app.kinderjournal.util.Text;
 
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
+import javafx.util.StringConverter;
 
 import java.awt.Desktop;
 import java.io.IOException;
@@ -40,7 +44,7 @@ import java.util.Map;
 public final class DataScreen implements Refreshable {
 
     private static final DateTimeFormatter STAMP =
-            DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm");
+            DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", Messages.current().locale());
 
     private final AppContext context;
     private final MainShell shell;
@@ -54,12 +58,12 @@ public final class DataScreen implements Refreshable {
 
     @Override
     public String title() {
-        return "Data & backup";
+        return Messages.get("data.title");
     }
 
     @Override
     public String subtitle() {
-        return "Everything is stored on this computer. Back it up regularly.";
+        return Messages.get("data.subtitle");
     }
 
     @Override
@@ -75,6 +79,7 @@ public final class DataScreen implements Refreshable {
         page.getChildren().add(buildRestoreCard());
         page.getChildren().add(buildHealthCard());
         page.getChildren().add(buildPersonalisationCard());
+        page.getChildren().add(buildLanguageCard());
         root.setContent(page);
     }
 
@@ -88,16 +93,17 @@ public final class DataScreen implements Refreshable {
         path.setEditable(false);
         path.setPrefColumnCount(52);
 
-        HBox pathRow = new HBox(8, path, Ui.button("Open this folder", this::openDataFolder));
+        HBox pathRow = new HBox(8, path, Ui.button(Messages.get("data.openFolder"),
+                this::openDataFolder));
         pathRow.setAlignment(Pos.CENTER_LEFT);
 
         details.getChildren().addAll(
-                Ui.fieldLabel("Data folder"),
+                Ui.fieldLabel(Messages.get("data.folder")),
                 pathRow,
-                Ui.meta("Database: " + AppPaths.databaseFile().getFileName()
-                        + "  \u00b7  Photos: " + AppPaths.photosDir().getFileName()
-                        + "  \u00b7  Size on disk: "
-                        + BackupService.readableSize(BackupService.dataFolderSize())));
+                Ui.meta(Messages.get("data.folderSummary",
+                        AppPaths.databaseFile().getFileName(),
+                        AppPaths.photosDir().getFileName(),
+                        BackupService.readableSize(BackupService.dataFolderSize()))));
 
         VBox counts_ = new VBox(4);
         for (Map.Entry<String, Integer> entry : counts.entrySet()) {
@@ -105,9 +111,8 @@ public final class DataScreen implements Refreshable {
         }
         details.getChildren().add(counts_);
 
-        details.getChildren().add(Ui.meta("KinderJournal makes no network connections. Nothing "
-                + "here is uploaded, synchronised or shared automatically."));
-        return Ui.card("Where your data lives", details);
+        details.getChildren().add(Ui.meta(Messages.get("data.noNetwork")));
+        return Ui.card(Messages.get("data.where"), details);
     }
 
     private void openDataFolder() {
@@ -121,7 +126,7 @@ public final class DataScreen implements Refreshable {
         } catch (IOException | UnsupportedOperationException ex) {
             Ui.logError("Opening the data folder", ex);
         }
-        Ui.info("Your data folder", dir.toAbsolutePath().toString());
+        Ui.info(Messages.get("data.folder"), dir.toAbsolutePath().toString());
     }
 
     // ------------------------------------------------------------------ backup
@@ -129,22 +134,19 @@ public final class DataScreen implements Refreshable {
     private Node buildBackupCard() {
         VBox box = new VBox(10);
 
-        box.getChildren().add(Ui.meta("A backup is one file containing the database and every "
-                + "attached photo. Keep a copy on a USB stick, an external disk or your school's "
-                + "secure drive."));
+        box.getChildren().add(Ui.meta(Messages.get("data.backupExplain")));
 
         HBox actions = new HBox(8,
-                Ui.primaryButton("Create a backup\u2026", this::createBackup),
-                Ui.button("Back up into the app folder", this::quickBackup),
-                Ui.button("Open the backups folder", this::openBackupsFolder));
+                Ui.primaryButton(Messages.get("data.createBackup"), this::createBackup),
+                Ui.button(Messages.get("data.quickBackup"), this::quickBackup),
+                Ui.button(Messages.get("data.openBackups"), this::openBackupsFolder));
         actions.setAlignment(Pos.CENTER_LEFT);
         box.getChildren().add(actions);
 
         List<Path> backups = BackupService.listBackups();
         VBox list = new VBox(6);
         if (backups.isEmpty()) {
-            list.getChildren().add(Ui.meta("No backups yet. Create one now so a broken computer "
-                    + "cannot lose your journal."));
+            list.getChildren().add(Ui.meta(Messages.get("data.noBackups")));
         } else {
             for (Path file : backups.subList(0, Math.min(8, backups.size()))) {
                 HBox row = new HBox(10);
@@ -155,24 +157,25 @@ public final class DataScreen implements Refreshable {
                         modifiedText(file),
                         BackupService.readableSize(sizeOf(file)),
                         file.getFileName().toString().startsWith("automatic-")
-                                ? "created automatically" : "created by you"));
+                                ? Messages.get("data.createdAutomatically")
+                                : Messages.get("data.createdByYou")));
                 meta.getStyleClass().add("meta");
                 row.getChildren().addAll(name, meta, Ui.spacer(),
-                        Ui.linkButton("Reveal", () -> reveal(file)));
+                        Ui.linkButton(Messages.get("data.reveal"), () -> reveal(file)));
                 list.getChildren().add(row);
             }
         }
-        box.getChildren().add(Ui.cardWithHeader("Recent backups", null, list));
-        return Ui.card("Backup", box);
+        box.getChildren().add(Ui.cardWithHeader(Messages.get("data.recentBackups"), null, list));
+        return Ui.card(Messages.get("data.backup"), box);
     }
 
     private void createBackup() {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Save a backup");
+        chooser.setTitle(Messages.get("data.saveBackup"));
         chooser.setInitialFileName(BackupService.suggestedFile().getFileName().toString());
         chooser.setInitialDirectory(AppPaths.backupsDir().toFile());
-        chooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("KinderJournal backup", "*" + BackupService.EXTENSION));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                Messages.get("data.backupFilter"), "*" + BackupService.EXTENSION));
         java.io.File chosen = chooser.showSaveDialog(shell.window());
         if (chosen == null) {
             return;
@@ -191,14 +194,14 @@ public final class DataScreen implements Refreshable {
         try {
             BackupService service = new BackupService(context.repo().db());
             BackupService.BackupResult result = service.backupTo(target);
-            Ui.info("Backup created",
-                    "Saved to:\n" + result.file().toAbsolutePath()
-                            + "\n\nContains: " + result.summary()
-                            + "\n\nKeep this file somewhere other than this computer, for example "
-                            + "on a USB stick or your school's secure drive.");
+            String body = Messages.get("data.backupCreatedBody") + "\n"
+                    + result.file().toAbsolutePath() + "\n\n"
+                    + Messages.get("data.backupCreatedContains", result.summary()) + "\n\n"
+                    + Messages.get("data.backupCreatedKeep");
+            Ui.info(Messages.get("data.backupCreated"), body);
             refresh();
         } catch (IOException | RuntimeException ex) {
-            Ui.error("The backup could not be created", ex);
+            Ui.error(Messages.get("data.backupFailed"), ex);
         }
     }
 
@@ -214,51 +217,47 @@ public final class DataScreen implements Refreshable {
         } catch (IOException | UnsupportedOperationException ex) {
             Ui.logError("Opening the backups folder", ex);
         }
-        Ui.info("Backups folder", dir.toAbsolutePath().toString());
+        Ui.info(Messages.get("data.openBackups"), dir.toAbsolutePath().toString());
     }
 
     private void reveal(Path file) {
-        Ui.info("Backup file", file.toAbsolutePath().toString());
+        Ui.info(Messages.get("data.backupFile"), file.toAbsolutePath().toString());
     }
 
     // ----------------------------------------------------------------- restore
 
     private Node buildRestoreCard() {
         VBox box = new VBox(10);
-        box.getChildren().add(Ui.meta("Restoring replaces everything currently in KinderJournal - "
-                + "classes, children, attendance, observations, interviews and photos - with the "
-                + "contents of the backup file. A safety copy of your current data is taken first, "
-                + "so a mistake can be undone."));
+        box.getChildren().add(Ui.meta(Messages.get("data.restoreExplain")));
 
-        HBox actions = new HBox(8, Ui.dangerButton("Restore from a backup\u2026", this::restore));
+        HBox actions = new HBox(8,
+                Ui.dangerButton(Messages.get("data.restoreAction"), this::restore));
         actions.setAlignment(Pos.CENTER_LEFT);
         box.getChildren().add(actions);
-        return Ui.card("Restore", box);
+        return Ui.card(Messages.get("data.restore"), box);
     }
 
     private void restore() {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Choose a backup to restore");
+        chooser.setTitle(Messages.get("data.chooseBackup"));
         chooser.setInitialDirectory(AppPaths.backupsDir().toFile());
-        chooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("KinderJournal backup", "*" + BackupService.EXTENSION));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                Messages.get("data.backupFilter"), "*" + BackupService.EXTENSION));
         java.io.File chosen = chooser.showOpenDialog(shell.window());
         if (chosen == null) {
             return;
         }
         Path source = chosen.toPath();
         if (!BackupService.looksLikeBackup(source)) {
-            Ui.error("That is not a backup file",
-                    "KinderJournal backups end in " + BackupService.EXTENSION
-                            + " and are created from this screen. Nothing was changed.");
+            Ui.error(Messages.get("data.notABackup"),
+                    Messages.get("data.notABackupBody", BackupService.EXTENSION));
             return;
         }
-        if (!Ui.confirmDestructive("Restore from this backup?",
-                "File: " + source.getFileName() + "\n\n"
-                        + "Everything currently in KinderJournal will be replaced. A safety copy of "
-                        + "your current data will be saved in the backups folder first.\n\n"
-                        + "If you are unsure, cancel and create a fresh backup now.",
-                "Restore now")) {
+        if (!Ui.confirmDestructive(Messages.get("data.restoreTitle"),
+                Messages.get("data.restoreBody", source.toAbsolutePath()) + "\n\n"
+                        + Messages.get("data.restoreBody2") + "\n\n"
+                        + Messages.get("data.restoreBody3"),
+                Messages.get("data.restoreConfirm"))) {
             return;
         }
         try {
@@ -267,15 +266,15 @@ public final class DataScreen implements Refreshable {
             context.reloadCurrentGroup();
             context.setCurrentChild(null);
             context.notifyDataChanged();
-            Ui.info("Restore complete",
-                    "Your data has been replaced with the contents of the backup ("
-                            + result.photos() + (result.photos() == 1 ? " photo" : " photos")
-                            + ", database " + result.databaseIntegrity() + ").\n\n"
-                            + "A safety copy of what was here before is saved as:\n"
+            String photos = result.photos() == 1 ? Messages.get("count.photo", result.photos())
+                    : Messages.get("count.photos", result.photos());
+            Ui.info(Messages.get("data.restoreDone"),
+                    Messages.get("data.restoreDoneBody", photos, result.databaseIntegrity())
+                            + "\n\n" + Messages.get("data.restoreSafety") + "\n"
                             + result.safetyCopy().toAbsolutePath());
             refresh();
         } catch (IOException | RuntimeException ex) {
-            Ui.error("The restore could not be completed", ex);
+            Ui.error(Messages.get("data.restoreFailed"), ex);
         }
     }
 
@@ -288,22 +287,22 @@ public final class DataScreen implements Refreshable {
         try {
             integrity = context.repo().db().integrityCheck();
         } catch (RuntimeException ex) {
-            integrity = "could not be checked: " + ex.getMessage();
+            integrity = Messages.get("data.integrityFailed", ex.getMessage());
         }
-        box.getChildren().add(Ui.keyValue("Database consistency", integrity));
-        box.getChildren().add(Ui.keyValue("Schema version",
+        box.getChildren().add(Ui.keyValue(Messages.get("data.integrity"), integrity));
+        box.getChildren().add(Ui.keyValue(Messages.get("data.schema"),
                 String.valueOf(app.kinderjournal.db.Db.SCHEMA_VERSION)));
 
         List<Photo> missing = context.repo().photos().listMissingFiles();
         if (missing.isEmpty()) {
-            box.getChildren().add(Ui.keyValue("Photo files", "all present"));
+            box.getChildren().add(Ui.keyValue(Messages.get("data.photoFiles"),
+                    Messages.get("data.allPresent")));
         } else {
             HBox banner = new HBox(8);
             banner.getStyleClass().add("warning-banner");
-            Label label = new Label(Text.plural(missing.size(), "attached photo has",
-                    "attached photos have") + " no image file in the photos folder. They may have "
-                    + "been moved or deleted outside the app. Open the record each one belongs to "
-                    + "and re-attach a replacement, or remove the entry.");
+            Label label = new Label(missing.size() == 1
+                    ? Messages.get("photos.missingWarningOne")
+                    : Messages.get("data.attachedPhotosMissing", missing.size()));
             label.setWrapText(true);
             banner.getChildren().add(label);
             box.getChildren().add(banner);
@@ -314,16 +313,18 @@ public final class DataScreen implements Refreshable {
                 row.setAlignment(Pos.CENTER_LEFT);
                 Label name = new Label(photo.getFile());
                 name.getStyleClass().add("row-subtitle");
-                Label where = new Label("attached to " + photo.getOwnerType().label());
+                Label where = new Label(Messages.get("data.attachedTo",
+                        photo.getOwnerType().label()));
                 where.getStyleClass().add("meta");
                 row.getChildren().addAll(name, where);
                 if (photo.getChildId() > 0) {
                     var child = context.repo().children().find(photo.getChildId());
                     if (child != null) {
-                        row.getChildren().addAll(Ui.spacer(), Ui.linkButton("Open profile", () -> {
-                            context.setCurrentChild(child);
-                            shell.show("children");
-                        }));
+                        row.getChildren().addAll(Ui.spacer(),
+                                Ui.linkButton(Messages.get("button.openProfile"), () -> {
+                                    context.setCurrentChild(child);
+                                    shell.show("children");
+                                }));
                     }
                 }
                 list.getChildren().add(row);
@@ -332,25 +333,23 @@ public final class DataScreen implements Refreshable {
         }
 
         HBox actions = new HBox(8,
-                Ui.button("Run the checks again", this::refresh),
-                Ui.button("Open the error log", this::openLog));
+                Ui.button(Messages.get("data.runChecks"), this::refresh),
+                Ui.button(Messages.get("data.openLog"), this::openLog));
         actions.setAlignment(Pos.CENTER_LEFT);
         box.getChildren().add(actions);
 
-        box.getChildren().add(Ui.meta("KinderJournal saves each change as it is made, so closing the "
-                + "app unexpectedly cannot lose the last record you entered."));
-        return Ui.card("Health check", box);
+        box.getChildren().add(Ui.meta(Messages.get("data.saveEachChange")));
+        return Ui.card(Messages.get("data.health"), box);
     }
 
     private void openLog() {
         Path log = AppPaths.logFile();
         if (!Files.isRegularFile(log)) {
-            Ui.info("No problems logged", "KinderJournal has not recorded any errors on this "
-                    + "computer. The log file will appear here if something goes wrong:\n\n"
-                    + log.toAbsolutePath());
+            Ui.info(Messages.get("data.noLog"),
+                    Messages.get("data.noLogBody") + "\n\n" + log.toAbsolutePath());
             return;
         }
-        Ui.info("Error log", log.toAbsolutePath().toString());
+        Ui.info(Messages.get("data.errorLog"), log.toAbsolutePath().toString());
     }
 
     // -------------------------------------------------------- personalisation
@@ -358,18 +357,68 @@ public final class DataScreen implements Refreshable {
     private Node buildPersonalisationCard() {
         VBox box = new VBox(10);
         TextField name = Ui.textField(context.teacherName(),
-                "Your name, shown on printed reports", 28);
-        box.getChildren().add(Ui.field("Teacher name", name));
-        box.getChildren().add(Ui.button("Save", () -> {
+                Messages.get("data.teacherNameHint"), 28);
+        box.getChildren().add(Ui.field(Messages.get("data.teacherName"), name));
+        box.getChildren().add(Ui.button(Messages.get("common.save"), () -> {
             context.setTeacherName(name.getText());
-            Ui.info("Saved", "Your name will appear on printed reports and in the sidebar.");
+            Ui.info(Messages.get("data.teacherNameSaved"),
+                    Messages.get("data.teacherNameSavedBody"));
             refresh();
         }));
-        box.getChildren().add(Ui.meta("KinderJournal does not have accounts or passwords. If other "
-                + "people can use this computer, protect the data folder with a Windows user account "
-                + "or a password-protected drive, because the records contain children's personal "
-                + "information."));
-        return Ui.card("Personalisation and privacy", box);
+        box.getChildren().add(Ui.meta(Messages.get("data.privacyNote")));
+        return Ui.card(Messages.get("data.personalisation"), box);
+    }
+
+    // ----------------------------------------------------------------- language
+
+    /**
+     * The language section: the same choice as the status-bar toggle, with a note
+     * of how complete the Mongolian translation is.
+     *
+     * <p>Switching here goes through {@link MainShell}'s listener, so the whole
+     * window is rebuilt in the new language rather than patched in place.
+     */
+    private Node buildLanguageCard() {
+        VBox box = new VBox(10);
+        box.getChildren().add(Ui.meta(Messages.get("data.languageExplain")));
+
+        ComboBox<Lang> choice = new ComboBox<>();
+        choice.getItems().addAll(Lang.values());
+        choice.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(Lang value) {
+                return value == null ? "" : value.nativeName();
+            }
+
+            @Override
+            public Lang fromString(String text) {
+                return null;
+            }
+        });
+        choice.setValue(Messages.current());
+        choice.setPrefWidth(220);
+        choice.valueProperty().addListener((observable, previous, next) -> {
+            if (next == null || next == Messages.current()) {
+                return;
+            }
+            context.repo().db().saveSetting("language", next.code());
+            Messages.setCurrent(next);
+        });
+
+        box.getChildren().add(Ui.field(Messages.get("data.language"), choice));
+        box.getChildren().add(Ui.meta(Messages.get("data.languageMongolian",
+                translationPercent())));
+        return Ui.card(Messages.get("data.language"), box);
+    }
+
+    /** How much of the English catalogue the Mongolian one translates, as a percentage. */
+    private static String translationPercent() {
+        int total = Messages.keys().size();
+        if (total == 0) {
+            return "0%";
+        }
+        int missing = Messages.missingFor(Lang.MONGOLIAN).size();
+        return Math.round((total - missing) * 100.0 / total) + "%";
     }
 
     // ----------------------------------------------------------------- helpers

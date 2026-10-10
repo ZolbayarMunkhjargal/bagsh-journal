@@ -1,6 +1,7 @@
 package app.kinderjournal.ui;
 
 import app.kinderjournal.db.DataException;
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.Child;
 import app.kinderjournal.util.AppPaths;
 
@@ -338,7 +339,7 @@ public final class Ui {
     public static Node imageOrPlaceholder(String storedFile, double width, double height) {
         Image image = loadImage(storedFile, width);
         if (image == null) {
-            Label missing = new Label("Photo file missing");
+            Label missing = new Label(Messages.get("reports.photoMissing"));
             missing.getStyleClass().add("photo-missing");
             missing.setPrefSize(width, height);
             missing.setAlignment(Pos.CENTER);
@@ -377,7 +378,8 @@ public final class Ui {
         String detail = ex instanceof DataException
                 ? ex.getMessage()
                 : (ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
-        error(title, detail + "\n\nTechnical details were written to:\n" + AppPaths.logFile());
+        error(title, detail + "\n\n" + Messages.get("error.technicalDetails")
+                + "\n" + AppPaths.logFile());
     }
 
     /** Appends a failure to the log file. Never throws. */
@@ -402,6 +404,7 @@ public final class Ui {
         if (alert.getDialogPane() != null) {
             alert.getDialogPane().setMinWidth(460);
             alert.getDialogPane().getStylesheets().addAll(Styles.stylesheet());
+            alert.getButtonTypes().setAll(dialogButton("common.close", ButtonBar.ButtonData.OK_DONE));
         }
         alert.showAndWait();
     }
@@ -413,7 +416,7 @@ public final class Ui {
         alert.setHeaderText(title);
         alert.setContentText(message);
         ButtonType yes = new ButtonType(confirmText, ButtonBar.ButtonData.OK_DONE);
-        ButtonType no = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        ButtonType no = dialogButton("common.cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
         alert.getButtonTypes().setAll(no, yes);
         alert.getDialogPane().setMinWidth(460);
         alert.getDialogPane().getStylesheets().addAll(Styles.stylesheet());
@@ -428,7 +431,7 @@ public final class Ui {
         alert.setHeaderText(title);
         alert.setContentText(message);
         ButtonType yes = new ButtonType(confirmText, ButtonBar.ButtonData.OK_DONE);
-        ButtonType no = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        ButtonType no = dialogButton("common.cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
         alert.getButtonTypes().setAll(no, yes);
         alert.getDialogPane().setMinWidth(500);
         alert.getDialogPane().getStylesheets().addAll(Styles.stylesheet());
@@ -447,11 +450,22 @@ public final class Ui {
         box.setPadding(new Insets(4, 4, 4, 4));
         dialog.getDialogPane().setContent(box);
         dialog.getDialogPane().setMinWidth(420);
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        ButtonType accept = dialogButton("common.save", ButtonBar.ButtonData.OK_DONE);
+        ButtonType dismiss = dialogButton("common.cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().addAll(accept, dismiss);
         dialog.getDialogPane().getStylesheets().addAll(Styles.stylesheet());
-        dialog.setResultConverter(button -> button == ButtonType.OK ? field.getText() : null);
+        dialog.setResultConverter(button -> button == accept ? field.getText() : null);
         javafx.application.Platform.runLater(field::requestFocus);
         return dialog.showAndWait();
+    }
+
+    /**
+     * A dialog button captioned in the current language. JavaFX's own button types
+     * are always English, and their captions cannot be replaced once built, so the
+     * localized text is carried by a type of our own.
+     */
+    private static ButtonType dialogButton(String key, ButtonBar.ButtonData data) {
+        return new ButtonType(Messages.get(key), data);
     }
 
     // ------------------------------------------------------------------ dates
@@ -463,7 +477,9 @@ public final class Ui {
     public static DatePicker datePicker(LocalDate value) {
         DatePicker picker = new DatePicker(value);
         picker.setConverter(new StringConverter<>() {
-            private final DateTimeFormatter format = DateTimeFormatter.ofPattern("d MMM yyyy");
+            // Month names follow the selected language, like every other date shown.
+            private final DateTimeFormatter format =
+                    DateTimeFormatter.ofPattern("d MMM yyyy", Messages.current().locale());
 
             @Override
             public String toString(LocalDate date) {

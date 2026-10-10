@@ -1,6 +1,8 @@
 package app.kinderjournal.ui;
 
 import app.kinderjournal.db.Repository;
+import app.kinderjournal.i18n.Lang;
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.Child;
 import app.kinderjournal.model.Group;
 import app.kinderjournal.util.Dates;
@@ -24,7 +26,6 @@ public final class AppContext {
     private final Repository repository;
     private final List<Consumer<Group>> groupListeners = new ArrayList<>();
     private final List<Runnable> dataListeners = new ArrayList<>();
-
     private Group currentGroup;
     private Child currentChild;
     private LocalDate selectedDate = LocalDate.now();
@@ -32,6 +33,9 @@ public final class AppContext {
 
     public AppContext(Repository repository) {
         this.repository = repository;
+        // The language is restored before any screen is built, so the whole
+        // interface comes up in the teacher's chosen language.
+        Messages.setCurrent(Lang.fromCode(repository.db().setting("language", Lang.ENGLISH.code())));
         this.teacherName = repository.db().setting("teacher_name", "");
         this.currentGroup = repository.groups().firstActive();
     }

@@ -2,6 +2,7 @@ package app.kinderjournal;
 
 import app.kinderjournal.backup.BackupService;
 import app.kinderjournal.db.Repository;
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.ui.AppContext;
 import app.kinderjournal.ui.MainShell;
 import app.kinderjournal.ui.Styles;
@@ -18,6 +19,7 @@ import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Locale;
 
 /**
  * KinderJournal - a local journal for kindergarten teachers.
@@ -51,7 +53,7 @@ public class App extends Application {
         scene.setOnKeyPressed(shell::handleShortcut);
 
         stage.setScene(scene);
-        stage.setTitle(Ui.APP_NAME + " \u2014 kindergarten journal");
+        stage.setTitle(Messages.get("app.windowTitle"));
         stage.setMinWidth(960);
         stage.setMinHeight(640);
         stage.setOnCloseRequest(event -> closeQuietly());
@@ -100,9 +102,9 @@ public class App extends Application {
      * plain Swing dialog is used when possible, with the console as a fallback.
      */
     private static void showStartupFailure(Throwable ex) {
-        String message = Ui.APP_NAME + " could not start.\n\n"
+        String message = Messages.get("error.startupTitle") + "\n\n"
                 + (ex.getMessage() == null ? ex.toString() : ex.getMessage())
-                + "\n\nNo records have been changed.";
+                + "\n\n" + Messages.get("error.noRecordsChanged");
         System.err.println(message);
         ex.printStackTrace(System.err);
         try {
@@ -112,7 +114,7 @@ public class App extends Application {
                 area.setLineWrap(true);
                 area.setWrapStyleWord(true);
                 javax.swing.JOptionPane.showMessageDialog(null, new javax.swing.JScrollPane(area),
-                        Ui.APP_NAME + " could not start", javax.swing.JOptionPane.ERROR_MESSAGE);
+                        Messages.get("error.startupTitle"), javax.swing.JOptionPane.ERROR_MESSAGE);
             }
         } catch (Throwable ignored) {
             // The console output above is the last resort.
@@ -132,8 +134,13 @@ public class App extends Application {
                 System.setProperty("kinderjournal.dataDir", value);
             }
         }
+        // JavaFX and the JDK both format numbers and dates per locale, so the
+        // default is aligned with the interface language. The stored preference is
+        // applied later, in AppContext, once the database can be read.
+        Locale.setDefault(Messages.current().locale());
         if (hasFlag(args, "--version")) {
-            System.out.println(Ui.APP_NAME + " 1.0  \u00b7  data folder: "
+            System.out.println(Messages.get("app.name") + " " + Messages.get("app.version")
+                    + "  \u00b7  " + Messages.get("diag.dataFolder") + ": "
                     + AppPaths.dataDir().toAbsolutePath());
             return;
         }
@@ -164,6 +171,18 @@ public class App extends Application {
         }
         if (hasFlag(args, "--ui-test")) {
             new app.kinderjournal.tools.UiSmokeTest().run();
+            return;
+        }
+        if (hasFlag(args, "--show")) {
+            // Opens the real window on sample data, in the given language, so the
+            // interface can be looked at rather than only asserted about.
+            System.setProperty(app.kinderjournal.tools.DemoWindow.PROPERTY_LANGUAGE,
+                    valueOf(args, "--show") == null ? "en" : valueOf(args, "--show"));
+            String folder = valueOf(args, "--data-dir");
+            if (folder != null) {
+                System.setProperty(app.kinderjournal.tools.DemoWindow.PROPERTY_FOLDER, folder);
+            }
+            launch(app.kinderjournal.tools.DemoWindow.class, new String[0]);
             return;
         }
         if (hasFlag(args, "--export-reports")) {
@@ -207,17 +226,17 @@ public class App extends Application {
      * @param verbose when true, a failure prints its full stack trace
      */
     private static void runDiagnostics(boolean verbose) {
-        System.out.println(Ui.APP_NAME + " diagnostics");
-        System.out.println("  data folder : " + AppPaths.dataDir().toAbsolutePath());
-        System.out.println("  database    : " + AppPaths.databaseFile());
-        System.out.println("  photos      : " + AppPaths.photosDir());
-        System.out.println("  backups     : " + AppPaths.backupsDir());
-        System.out.println("  log         : " + AppPaths.logFile());
+        System.out.println(Messages.get("diag.title"));
+        System.out.println("  " + pad(Messages.get("diag.dataFolder")) + ": " + AppPaths.dataDir().toAbsolutePath());
+        System.out.println("  " + pad(Messages.get("diag.database")) + ": " + AppPaths.databaseFile());
+        System.out.println("  " + pad(Messages.get("diag.photos")) + ": " + AppPaths.photosDir());
+        System.out.println("  " + pad(Messages.get("diag.backups")) + ": " + AppPaths.backupsDir());
+        System.out.println("  " + pad(Messages.get("diag.log")) + ": " + AppPaths.logFile());
         try (Repository repo = Repository.open()) {
-            System.out.println("  integrity   : " + repo.db().integrityCheck());
+            System.out.println("  " + pad(Messages.get("diag.integrity")) + ": " + repo.db().integrityCheck());
             repo.counts().forEach((key, value) -> System.out.println("  " + pad(key) + ": " + value));
             int missing = repo.photos().listMissingFiles().size();
-            System.out.println("  missing photos: " + missing);
+            System.out.println("  " + pad(Messages.get("diag.missingPhotos")) + ": " + missing);
         } catch (RuntimeException ex) {
             System.out.println("  ERROR: " + ex.getMessage());
             if (verbose) {

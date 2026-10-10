@@ -1,5 +1,7 @@
 package app.kinderjournal.ui;
 
+import app.kinderjournal.i18n.Lang;
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.Group;
 import app.kinderjournal.ui.screen.AttendanceScreen;
 import app.kinderjournal.ui.screen.ChildrenScreen;
@@ -45,9 +47,14 @@ import java.util.function.Function;
  */
 public final class MainShell {
 
-    /** One entry in the sidebar. */
-    private record NavItem(String key, String glyph, String label, String shortcut,
+    /** One entry in the sidebar. The caption is looked up per language. */
+    private record NavItem(String key, String glyph, String titleKey, String shortcut,
                            Function<AppContext, Refreshable> factory) {
+
+        /** The caption in the language currently selected. */
+        String label() {
+            return Messages.get(titleKey);
+        }
     }
 
     private final AppContext context;
@@ -61,6 +68,10 @@ public final class MainShell {
     private final Map<String, Button> navButtons = new LinkedHashMap<>();
     private final List<NavItem> navItems = new ArrayList<>();
 
+    /** Rebuilt when the language changes, so their captions can be replaced. */
+    private final VBox sidebar = new VBox();
+    private final HBox statusBar = new HBox(16);
+
     private Refreshable current;
     private String currentKey;
 
@@ -68,15 +79,30 @@ public final class MainShell {
         this.context = context;
         this.stage = stage;
         registerScreens();
+
         root.getStyleClass().add("app-shell");
-        root.setLeft(buildSidebar());
+        sidebar.getStyleClass().add("sidebar");
+        statusBar.getStyleClass().add("status-bar");
+        statusBar.setAlignment(Pos.CENTER_LEFT);
+
+        buildSidebar();
+        root.setLeft(sidebar);
         root.setCenter(buildContent());
-        root.setBottom(buildStatusBar());
+        buildStatusBar();
+        root.setBottom(statusBar);
 
         context.onDataChanged(this::refreshCurrent);
         context.onGroupChanged(group -> {
             updateStatusGroup(group);
             refreshCurrent();
+        });
+        // Rebuilding the shell is how a language change takes effect: every label
+        // is created from the catalogue, so new text means new nodes. The choice is
+        // recorded here rather than in the button handler, so it is saved however
+        // the language was changed - including from the Data screen's selector.
+        Messages.onChange(() -> {
+            context.repo().db().saveSetting("language", Messages.current().code());
+            relanguage();
         });
 
         show("dashboard");
@@ -89,27 +115,27 @@ public final class MainShell {
     // ---------------------------------------------------------------- registry
 
     private void registerScreens() {
-        navItems.add(new NavItem("dashboard", "\u25a6", "Dashboard", "Ctrl+1",
+        navItems.add(new NavItem("dashboard", "\u25a6", "nav.dashboard", "Ctrl+1",
                 ctx -> new DashboardScreen(ctx, this)));
-        navItems.add(new NavItem("children", "\u263a", "Children", "Ctrl+2",
+        navItems.add(new NavItem("children", "\u263a", "nav.children", "Ctrl+2",
                 ctx -> new ChildrenScreen(ctx, this)));
-        navItems.add(new NavItem("classes", "\u25a4", "Classes", "Ctrl+3",
+        navItems.add(new NavItem("classes", "\u25a4", "nav.classes", "Ctrl+3",
                 ctx -> new ClassesScreen(ctx, this)));
-        navItems.add(new NavItem("attendance", "\u2713", "Attendance", "Ctrl+4",
+        navItems.add(new NavItem("attendance", "\u2713", "nav.attendance", "Ctrl+4",
                 ctx -> new AttendanceScreen(ctx, this)));
-        navItems.add(new NavItem("observations", "\u270e", "Observations", "Ctrl+5",
+        navItems.add(new NavItem("observations", "\u270e", "nav.observations", "Ctrl+5",
                 ctx -> new ObservationsScreen(ctx, this)));
-        navItems.add(new NavItem("interviews", "\u260e", "Interviews", "Ctrl+6",
+        navItems.add(new NavItem("interviews", "\u260e", "nav.interviews", "Ctrl+6",
                 ctx -> new InterviewsScreen(ctx, this)));
-        navItems.add(new NavItem("history", "\u21bb", "Child history", "Ctrl+7",
+        navItems.add(new NavItem("history", "\u21bb", "nav.history", "Ctrl+7",
                 ctx -> new HistoryScreen(ctx, this)));
-        navItems.add(new NavItem("plans", "\u25a3", "Lesson plans", "Ctrl+8",
+        navItems.add(new NavItem("plans", "\u25a3", "nav.plans", "Ctrl+8",
                 ctx -> new PlansScreen(ctx, this)));
-        navItems.add(new NavItem("search", "\u2315", "Search", "Ctrl+F",
+        navItems.add(new NavItem("search", "\u2315", "nav.search", "Ctrl+F",
                 ctx -> new SearchScreen(ctx, this)));
-        navItems.add(new NavItem("reports", "\u2399", "Print & reports", "Ctrl+P",
+        navItems.add(new NavItem("reports", "\u2399", "nav.reports", "Ctrl+P",
                 ctx -> new ReportsScreen(ctx, this)));
-        navItems.add(new NavItem("data", "\u2691", "Data & backup", "",
+        navItems.add(new NavItem("data", "\u2691", "nav.data", "",
                 ctx -> new DataScreen(ctx, this)));
     }
 
@@ -124,29 +150,30 @@ public final class MainShell {
 
     // ---------------------------------------------------------------- sidebar
 
-    private Node buildSidebar() {
-        VBox sidebar = new VBox();
-        sidebar.getStyleClass().add("sidebar");
+    /** Fills the sidebar in the current language; called again on a language change. */
+    private void buildSidebar() {
+        sidebar.getChildren().clear();
+        navButtons.clear();
 
         VBox brand = new VBox(1);
         brand.getStyleClass().add("sidebar-brand");
-        Label title = new Label(Ui.APP_NAME);
+        Label title = new Label(Messages.get("app.name"));
         title.getStyleClass().add("brand-title");
-        Label subtitle = new Label("Kindergarten journal");
+        Label subtitle = new Label(Messages.get("app.tagline"));
         subtitle.getStyleClass().add("brand-subtitle");
         brand.getChildren().addAll(title, subtitle);
         sidebar.getChildren().add(brand);
 
-        sidebar.getChildren().add(navSectionLabel("Overview"));
+        sidebar.getChildren().add(navSectionLabel(Messages.get("nav.section.overview")));
         sidebar.getChildren().add(navButton("dashboard"));
-        sidebar.getChildren().add(navSectionLabel("Records"));
+        sidebar.getChildren().add(navSectionLabel(Messages.get("nav.section.records")));
         for (String key : List.of("children", "classes", "attendance", "observations",
                 "interviews", "history")) {
             sidebar.getChildren().add(navButton(key));
         }
-        sidebar.getChildren().add(navSectionLabel("Planning"));
+        sidebar.getChildren().add(navSectionLabel(Messages.get("nav.section.planning")));
         sidebar.getChildren().add(navButton("plans"));
-        sidebar.getChildren().add(navSectionLabel("Tools"));
+        sidebar.getChildren().add(navSectionLabel(Messages.get("nav.section.tools")));
         for (String key : List.of("search", "reports", "data")) {
             sidebar.getChildren().add(navButton(key));
         }
@@ -157,14 +184,19 @@ public final class MainShell {
         footer.getStyleClass().add("sidebar-footer");
         Label teacher = new Label(teacherLine());
         teacher.setWrapText(true);
-        Label tip = new Label("All data stays on this computer");
+        Label tip = new Label(Messages.get("app.dataStaysLocal"));
         tip.setWrapText(true);
         footer.getChildren().addAll(teacher, tip);
         sidebar.getChildren().add(footer);
 
-        context.onGroupChanged(group -> teacher.setText(teacherLine()));
-        return sidebar;
+        // The sidebar is rebuilt on a language change, so the listener is replaced
+        // rather than added again; the footer label is the only thing it updates.
+        sidebarFooterTeacher = teacher;
+        toolbarLanguageNote = tip;
     }
+
+    private Label sidebarFooterTeacher;
+    private Label toolbarLanguageNote;
 
     private String teacherLine() {
         String name = context.teacherName();
@@ -180,12 +212,13 @@ public final class MainShell {
 
     private Button navButton(String key) {
         NavItem item = item(key);
-        Button button = new Button(item.glyph() + "   " + item.label());
+        Button button = new Button(item.glyph() + "   " + Messages.get(item.titleKey()));
         button.getStyleClass().add("nav-button");
         button.setMaxWidth(Double.MAX_VALUE);
         button.setOnAction(event -> show(key));
         if (!item.shortcut().isEmpty()) {
-            button.setTooltip(new Tooltip(item.label() + "  (" + item.shortcut() + ")"));
+            button.setTooltip(new Tooltip(Messages.get("nav.tooltip",
+                    Messages.get(item.titleKey()), item.shortcut())));
         }
         navButtons.put(key, button);
         return button;
@@ -216,20 +249,58 @@ public final class MainShell {
         return content;
     }
 
-    private Node buildStatusBar() {
-        HBox bar = new HBox(16);
-        bar.getStyleClass().add("status-bar");
-        bar.setAlignment(Pos.CENTER_LEFT);
-        statusGroup.setText("\u25cf " + context.currentGroupName());
-        statusGroup.setTooltip(new Tooltip("The class currently being worked on"));
-        Label where = new Label("Data folder: " + shortenedPath());
+    private void buildStatusBar() {
+        statusBar.getChildren().clear();
+        statusGroup.setText(Messages.get("status.currentClass", context.currentGroupName()));
+        statusGroup.setTooltip(new Tooltip(Messages.get("status.currentClassTooltip")));
+        Label where = new Label(Messages.get("status.dataFolder", shortenedPath()));
         where.setTooltip(new Tooltip(context.repo().dataLocationText()));
-        bar.getChildren().addAll(statusGroup, Ui.spacer(), where);
-        return bar;
+        statusBar.getChildren().addAll(statusGroup, Ui.spacer(), where, buildLanguageToggle());
+    }
+
+    /**
+     * The language button: shows the language it will switch to, in that
+     * language's own script, so it reads correctly whichever one is active.
+     */
+    private Node buildLanguageToggle() {
+        Lang target = Messages.current().other();
+        Button button = new Button("\u25cf " + target.nativeName());
+        button.getStyleClass().add("language-toggle");
+        button.setTooltip(new Tooltip(Messages.get("language.tooltip", target.nativeName())));
+        button.setOnAction(event -> changeLanguage(target));
+        return button;
+    }
+
+    /** Switches language; the change listener records the choice and rebuilds. */
+    private void changeLanguage(Lang target) {
+        Messages.setCurrent(target);
+    }
+
+    /**
+     * Rebuilds the whole window in the newly selected language.
+     *
+     * <p>Called through {@link Messages#onChange}, so it also runs if the language
+     * is changed from somewhere other than the status bar.
+     */
+    private void relanguage() {
+        buildSidebar();
+        buildStatusBar();
+        if (sidebarFooterTeacher != null) {
+            sidebarFooterTeacher.setText(teacherLine());
+        }
+        // Every screen builds its labels in its constructor, so the current one is
+        // discarded and rebuilt rather than patched label by label.
+        if (currentKey != null) {
+            show(currentKey);
+        }
+        if (stage != null) {
+            stage.setTitle(Messages.get("app.windowTitle"));
+        }
     }
 
     private void updateStatusGroup(Group group) {
-        statusGroup.setText("\u25cf " + (group == null ? "No class selected" : group.getName()));
+        statusGroup.setText(Messages.get("status.currentClass",
+                group == null ? Messages.get("status.noClassSelected") : group.getName()));
     }
 
     private String shortenedPath() {
@@ -249,7 +320,7 @@ public final class MainShell {
         try {
             view = item.factory().apply(context);
         } catch (RuntimeException ex) {
-            Ui.error("Could not open " + item.label(), ex);
+            Ui.error(Messages.get("error.couldNotOpen", item.label()), ex);
             return;
         }
         currentKey = key;
@@ -265,7 +336,7 @@ public final class MainShell {
             }
         }
         if (stage != null) {
-            stage.setTitle(Ui.APP_NAME + " \u2014 " + headerTitle.getText());
+            stage.setTitle(Messages.get("app.windowTitle"));
         }
     }
 
@@ -295,7 +366,7 @@ public final class MainShell {
             applyHeader(current);
             contentHost.getChildren().setAll(current.node());
         } catch (RuntimeException ex) {
-            Ui.error("Could not refresh this screen", ex);
+            Ui.error(Messages.get("error.couldNotRefresh"), ex);
         }
     }
 
@@ -388,11 +459,10 @@ public final class MainShell {
         if (!app.kinderjournal.util.AppPaths.isUsingFallback()) {
             return;
         }
-        Ui.warn("Using a fallback data folder",
-                "KinderJournal could not write to your usual application data folder, so it is "
-                        + "keeping its data here instead:\n\n"
-                        + context.repo().dataLocationText()
-                        + "\n\nEverything still works, but remember this location when making backups.");
+        Ui.warn(Messages.get("error.fallbackFolder"),
+                Messages.get("error.fallbackFolderBody") + "\n\n"
+                        + context.repo().dataLocationText() + "\n\n"
+                        + Messages.get("error.fallbackFolderBody2"));
     }
 
     /** The class selector widget, reused on screens that need one. */

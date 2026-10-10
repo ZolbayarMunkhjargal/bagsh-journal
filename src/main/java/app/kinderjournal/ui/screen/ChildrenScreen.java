@@ -2,6 +2,7 @@ package app.kinderjournal.ui.screen;
 
 import app.kinderjournal.db.AttendanceDao;
 import app.kinderjournal.db.Repository;
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.model.Child;
 import app.kinderjournal.model.Choices;
 import app.kinderjournal.model.Group;
@@ -74,12 +75,12 @@ public final class ChildrenScreen implements Refreshable {
 
     @Override
     public String title() {
-        return "Children";
+        return Messages.get("children.title");
     }
 
     @Override
     public String subtitle() {
-        return "Profiles, contacts, photos and the records belonging to each child.";
+        return Messages.get("children.subtitle");
     }
 
     @Override
@@ -100,31 +101,38 @@ public final class ChildrenScreen implements Refreshable {
             }
         }
 
+        String rosterCount = Messages.get(children.size() == 1 ? "count.child" : "count.children",
+                children.size());
         VBox page = Ui.page();
         HBox header = new HBox(10);
         header.setAlignment(Pos.CENTER_LEFT);
         header.getChildren().addAll(
-                Ui.screenTitle("Children"),
-                Ui.meta(Text.plural(children.size(), "child", "children")),
+                Ui.screenTitle(Messages.get("children.title")),
+                Ui.meta(rosterCount),
                 Ui.spacer(),
-                Ui.primaryButton("Add a child", this::openNewChildForm));
+                Ui.primaryButton(Messages.get("button.addChild"), this::openNewChildForm));
         page.getChildren().add(header);
 
         HBox filterRow = new HBox(10);
         filterRow.setAlignment(Pos.CENTER_LEFT);
-        TextField search = Ui.textField(searchText, "Search by name\u2026", 18);
+        TextField search = Ui.textField(searchText, Messages.get("children.search"), 18);
         search.textProperty().addListener((observable, previous, next) -> {
             searchText = next == null ? "" : next;
             refresh();
         });
+        // The scope items double as the values compared below, so translating them
+        // keeps the selection working in every language.
+        String scopeThisClass = Messages.get("children.scope.thisClass");
+        String scopeAllClasses = Messages.get("children.scope.allClasses");
         ComboBox<String> scope = new ComboBox<>();
-        scope.getItems().addAll("This class", "All classes", "Unassigned");
-        scope.setValue(showAllClasses ? "All classes" : "This class");
+        scope.getItems().addAll(scopeThisClass, scopeAllClasses,
+                Messages.get("children.scope.unassigned"));
+        scope.setValue(showAllClasses ? scopeAllClasses : scopeThisClass);
         scope.valueProperty().addListener((observable, previous, next) -> {
-            showAllClasses = "All classes".equals(next);
+            showAllClasses = scopeAllClasses.equals(next);
             refresh();
         });
-        CheckBox archived = new CheckBox("Include archived");
+        CheckBox archived = new CheckBox(Messages.get("children.includeArchived"));
         archived.setSelected(showArchived);
         archived.selectedProperty().addListener((observable, previous, next) -> {
             showArchived = next;
@@ -135,12 +143,12 @@ public final class ChildrenScreen implements Refreshable {
 
         if (children.isEmpty()) {
             page.getChildren().add(Ui.emptyState(
-                    context.currentGroup() == null ? "No class selected" : "No children found",
+                    context.currentGroup() == null ? Messages.get("children.empty.noClass")
+                            : Messages.get("children.empty.title"),
                     context.currentGroup() == null
-                            ? "Create a class first, then add the children in it."
-                            : "Add the children in " + context.currentGroupName()
-                            + ", or change the filter above to look at another class.",
-                    Ui.primaryButton("Add a child", this::openNewChildForm)));
+                            ? Messages.get("children.empty.noClassBody")
+                            : Messages.get("children.empty.body", context.currentGroupName()),
+                    Ui.primaryButton(Messages.get("button.addChild"), this::openNewChildForm)));
             root.setContent(page);
             return;
         }
@@ -153,7 +161,7 @@ public final class ChildrenScreen implements Refreshable {
         }
 
         VBox detail = selected == null
-                ? new VBox(Ui.meta("Select a child to see their profile."))
+                ? new VBox(Ui.meta(Messages.get("children.selectPrompt")))
                 : buildProfile(selected);
         HBox.setHgrow(detail, Priority.ALWAYS);
         HBox.setHgrow(list, Priority.NEVER);
@@ -191,8 +199,9 @@ public final class ChildrenScreen implements Refreshable {
     private Node childRow(Child child, boolean selected) {
         String subtitle = Text.joinNonBlank(" \u00b7 ",
                 child.ageText(),
-                child.getGroupName().isBlank() ? "no class" : child.getGroupName(),
-                child.isArchived() ? "archived" : "");
+                child.getGroupName().isBlank() ? Messages.get("classes.noClassWord")
+                        : child.getGroupName(),
+                child.isArchived() ? Messages.get("classes.archived") : "");
         return RecordList.selectableRow(Ui.avatar(child, 16), child.fullName(), subtitle,
                 ReportsScreenSupport.childrenBadge(context, child), selected, () -> {
                     selectedChildId = child.getId();
@@ -217,41 +226,46 @@ public final class ChildrenScreen implements Refreshable {
         name.getStyleClass().add("screen-title");
         names.getChildren().add(name);
         Label meta = new Label(Text.joinNonBlank(" \u00b7 ",
-                child.getGroupName().isBlank() ? "No class assigned" : child.getGroupName(),
+                child.getGroupName().isBlank() ? Messages.get("common.noClassAssigned")
+                        : child.getGroupName(),
                 child.birthSummary(),
-                child.getStartDate() == null ? "" : "Started " + Dates.display(child.getStartDate()),
-                child.isArchived() ? "Archived" : ""));
+                child.getStartDate() == null ? ""
+                        : Messages.get("children.startedOn", Dates.display(child.getStartDate())),
+                child.isArchived() ? Messages.get("children.archived") : ""));
         meta.getStyleClass().add("meta");
         meta.setWrapText(true);
         names.getChildren().add(meta);
         if (!Text.isBlank(child.getAllergies())) {
-            Label allergy = Ui.pill("Allergies: " + child.getAllergies(), "pill-absent");
+            Label allergy = Ui.pill(Messages.get("children.allergyChip", child.getAllergies()),
+                    "pill-absent");
             names.getChildren().add(allergy);
         }
         identity.getChildren().addAll(names, Ui.spacer());
 
         VBox photoActions = new VBox(4,
-                Ui.button("Change photo\u2026", () -> chooseProfilePhoto(child)),
-                child.getPhotoFile() == null ? new Label() : Ui.linkButton("Remove photo",
-                        () -> removeProfilePhoto(child)));
+                Ui.button(Messages.get("button.changePhoto"), () -> chooseProfilePhoto(child)),
+                child.getPhotoFile() == null ? new Label()
+                        : Ui.linkButton(Messages.get("button.removePhoto"),
+                                () -> removeProfilePhoto(child)));
         identity.getChildren().add(photoActions);
         box.getChildren().add(identity);
 
         // --- main actions
         FlowPane actions = new FlowPane(8, 8);
         actions.getChildren().addAll(
-                Ui.primaryButton("Add observation", () -> shell.showAnd("observations",
-                        screen -> {
+                Ui.primaryButton(Messages.get("children.primaryAction.addObservation"),
+                        () -> shell.showAnd("observations", screen -> {
                             if (screen instanceof ObservationsScreen observations) {
                                 observations.openNewForm(child);
                             }
                         })),
-                Ui.button("Record interview", () -> shell.showAnd("interviews", screen -> {
-                    if (screen instanceof InterviewsScreen interviews) {
-                        interviews.openNewForm(child);
-                    }
-                })),
-                Ui.button("Full history", () -> {
+                Ui.button(Messages.get("children.primaryAction.recordInterview"),
+                        () -> shell.showAnd("interviews", screen -> {
+                            if (screen instanceof InterviewsScreen interviews) {
+                                interviews.openNewForm(child);
+                            }
+                        })),
+                Ui.button(Messages.get("children.primaryAction.fullHistory"), () -> {
                     context.setCurrentChild(child);
                     shell.showAnd("history", screen -> {
                         if (screen instanceof HistoryScreen history) {
@@ -259,13 +273,15 @@ public final class ChildrenScreen implements Refreshable {
                         }
                     });
                 }),
-                Ui.button("Edit profile", () -> openEditForm(child)),
-                Ui.button("Move to another class", () -> openMoveDialog(child)),
-                Ui.button("Print report", () -> shell.showAnd("reports", screen -> {
-                    if (screen instanceof ReportsScreen reports) {
-                        reports.presetChild(child);
-                    }
-                })));
+                Ui.button(Messages.get("children.primaryAction.editProfile"), () -> openEditForm(child)),
+                Ui.button(Messages.get("children.primaryAction.moveClass"),
+                        () -> openMoveDialog(child)),
+                Ui.button(Messages.get("children.primaryAction.printReport"),
+                        () -> shell.showAnd("reports", screen -> {
+                            if (screen instanceof ReportsScreen reports) {
+                                reports.presetChild(child);
+                            }
+                        })));
         box.getChildren().add(actions);
 
         // --- numbers
@@ -273,37 +289,51 @@ public final class ChildrenScreen implements Refreshable {
         LocalDate from = to.minusMonths(3);
         Repository.ChildSummary summary = repo.summaryFor(child.getId(), from, to);
         AttendanceDao.Summary attendance = summary.attendance();
+        String last3Months = Messages.get("children.tile.last3Months");
         FlowPane tiles = new FlowPane(12, 12);
         tiles.getChildren().addAll(
-                miniTile(attendance.rateText(), "Attendance rate", "last 3 months"),
-                miniTile(String.valueOf(attendance.absent()), "Days absent", "last 3 months"),
-                miniTile(String.valueOf(summary.observations()), "Observations", "last 3 months"),
-                miniTile(String.valueOf(summary.interviews()), "Interviews", "last 3 months"),
-                miniTile(String.valueOf(summary.photos()), "Photos", "on file"));
+                miniTile(attendance.rateText(), Messages.get("children.tile.attendanceRate"),
+                        last3Months),
+                miniTile(String.valueOf(attendance.absent()), Messages.get("children.tile.daysAbsent"),
+                        last3Months),
+                miniTile(String.valueOf(summary.observations()),
+                        Messages.get("children.tile.observations"), last3Months),
+                miniTile(String.valueOf(summary.interviews()),
+                        Messages.get("children.tile.interviews"), last3Months),
+                miniTile(String.valueOf(summary.photos()), Messages.get("children.tile.photos"),
+                        Messages.get("children.tile.onFile")));
         box.getChildren().add(tiles);
 
         // --- contact details
         GridPane fields = Ui.formGrid();
-        fields.add(Ui.labelledValue("Date of birth",
+        fields.add(Ui.labelledValue(Messages.get("children.field.dateOfBirth"),
                 child.getBirthDate() == null ? "" : Dates.display(child.getBirthDate())
                         + (child.ageText().isEmpty() ? "" : "  (" + child.ageText() + ")")), 0, 0);
-        fields.add(Ui.labelledValue("First day", child.getStartDate() == null ? ""
-                : Dates.display(child.getStartDate())), 1, 0);
-        fields.add(Ui.labelledValue("Guardian", Text.joinNonBlank(" \u00b7 ",
-                child.getGuardianName(), child.getGuardianRelation())), 0, 1);
-        fields.add(Ui.labelledValue("Phone", child.getGuardianPhone()), 1, 1);
-        fields.add(Ui.labelledValue("Email", child.getGuardianEmail()), 0, 2);
-        fields.add(Ui.labelledValue("Second contact", child.getSecondContact()), 1, 2);
-        fields.add(Ui.labelledValue("Address", child.getAddress()), 0, 3, 2, 1);
-        fields.add(Ui.labelledValue("Allergies / medical notes", child.getAllergies()), 0, 4, 2, 1);
-        fields.add(Ui.labelledValue("Profile notes", child.getNotes()), 0, 5, 2, 1);
-        box.getChildren().add(Ui.card("Profile", fields));
+        fields.add(Ui.labelledValue(Messages.get("children.field.firstDay"),
+                child.getStartDate() == null ? ""
+                        : Dates.display(child.getStartDate())), 1, 0);
+        fields.add(Ui.labelledValue(Messages.get("children.field.guardian"),
+                Text.joinNonBlank(" \u00b7 ",
+                        child.getGuardianName(), child.getGuardianRelation())), 0, 1);
+        fields.add(Ui.labelledValue(Messages.get("children.field.phone"), child.getGuardianPhone()),
+                1, 1);
+        fields.add(Ui.labelledValue(Messages.get("children.field.email"), child.getGuardianEmail()),
+                0, 2);
+        fields.add(Ui.labelledValue(Messages.get("children.field.secondContact"),
+                child.getSecondContact()), 1, 2);
+        fields.add(Ui.labelledValue(Messages.get("children.field.address"), child.getAddress()),
+                0, 3, 2, 1);
+        fields.add(Ui.labelledValue(Messages.get("children.field.allergies"), child.getAllergies()),
+                0, 4, 2, 1);
+        fields.add(Ui.labelledValue(Messages.get("children.field.profileNotes"), child.getNotes()),
+                0, 5, 2, 1);
+        box.getChildren().add(Ui.card(Messages.get("children.profileCard"), fields));
 
         // --- recent records
         List<HistoryEntry> history = repo.childHistory(child.getId(), from, to, null, null);
         VBox recent = new VBox(6);
         if (history.isEmpty()) {
-            recent.getChildren().add(Ui.meta("Nothing recorded in the last three months."));
+            recent.getChildren().add(Ui.meta(Messages.get("children.noRecordsRecently")));
         } else {
             for (HistoryEntry entry : history.subList(0, Math.min(8, history.size()))) {
                 recent.getChildren().add(RecordList.timelineEntry(entry, e -> {
@@ -316,26 +346,27 @@ public final class ChildrenScreen implements Refreshable {
                 }, null, null, true, true));
             }
         }
-        box.getChildren().add(Ui.cardWithHeader("Recent records", Ui.linkButton("Everything \u2192",
-                () -> shell.showAnd("history", screen -> {
-                    if (screen instanceof HistoryScreen historyScreen) {
-                        historyScreen.selectChild(child);
-                    }
-                })), recent));
+        box.getChildren().add(Ui.cardWithHeader(Messages.get("children.recentRecords"),
+                Ui.linkButton(Messages.get("children.everything"),
+                        () -> shell.showAnd("history", screen -> {
+                            if (screen instanceof HistoryScreen historyScreen) {
+                                historyScreen.selectChild(child);
+                            }
+                        })), recent));
 
         // --- photos
         box.getChildren().add(photosCard(child));
 
         // --- danger zone
         HBox dangerous = new HBox(8,
-                Ui.button(child.isArchived() ? "Restore child" : "Archive child", () -> {
+                Ui.button(child.isArchived() ? Messages.get("children.restore")
+                        : Messages.get("children.archive"), () -> {
                     context.repo().children().setArchived(child.getId(), !child.isArchived());
                     context.notifyDataChanged();
                 }),
-                Ui.dangerButton("Delete child\u2026", () -> deleteChild(child)));
-        box.getChildren().add(Ui.card("Archive or remove", dangerous,
-                Ui.meta("Archiving keeps every record but hides the child from registers. "
-                        + "Deleting removes the profile, all records and all attached photos.")));
+                Ui.dangerButton(Messages.get("children.delete"), () -> deleteChild(child)));
+        box.getChildren().add(Ui.card(Messages.get("children.archiveCard"), dangerous,
+                Ui.meta(Messages.get("children.archiveExplain"))));
 
         return box;
     }
@@ -375,31 +406,31 @@ public final class ChildrenScreen implements Refreshable {
             Label where = new Label(photo.getOwnerType().label());
             where.getStyleClass().add("stat-hint");
             HBox buttons = new HBox(2,
-                    Ui.linkButton("Caption", () -> editCaption(photo)),
-                    Ui.linkButton("Remove", () -> removePhoto(photo)));
+                    Ui.linkButton(Messages.get("photos.caption"), () -> editCaption(photo)),
+                    Ui.linkButton(Messages.get("photos.remove"), () -> removePhoto(photo)));
             tile.getChildren().addAll(caption, where, buttons);
             pane.getChildren().add(tile);
         }
 
         VBox wrapper = new VBox(10);
         if (photos.isEmpty()) {
-            wrapper.getChildren().add(Ui.meta("No photos attached to this child yet."));
+            wrapper.getChildren().add(Ui.meta(Messages.get("children.noPhotos")));
         } else {
             wrapper.getChildren().add(pane);
         }
         wrapper.getChildren().add(Ui.row(
-                Ui.button("Attach a photo\u2026", () -> attachPhoto(child)),
-                Ui.meta("Photos are copied into the local data folder and never uploaded.")));
-        return Ui.cardWithHeader("Photos  (" + photos.size() + ")", null, wrapper);
+                Ui.button(Messages.get("children.attachPhoto"), () -> attachPhoto(child)),
+                Ui.meta(Messages.get("children.photoLocal"))));
+        return Ui.cardWithHeader(Messages.get("children.photos.title", photos.size()), null, wrapper);
     }
 
     private void attachPhoto(Child child) {
-        File file = chooseImage("Attach a photo");
+        File file = chooseImage(Messages.get("children.attachPhoto"));
         if (file == null) {
             return;
         }
-        String caption = Ui.prompt("Photo caption",
-                "Describe the photo (optional)", "").orElse(null);
+        String caption = Ui.prompt(Messages.get("children.photoCaption"),
+                Messages.get("children.photoCaptionOptional"), "").orElse(null);
         if (caption == null) {
             return;
         }
@@ -408,12 +439,13 @@ public final class ChildrenScreen implements Refreshable {
                     file.toPath(), caption);
             context.notifyDataChanged();
         } catch (Exception ex) {
-            Ui.error("Could not attach this photo", ex);
+            Ui.error(Messages.get("photos.couldNotAttach"), ex);
         }
     }
 
     private void editCaption(Photo photo) {
-        String value = Ui.prompt("Photo caption", "Caption", photo.getCaption()).orElse(null);
+        String value = Ui.prompt(Messages.get("children.photoCaption"),
+                Messages.get("children.photoCaptionLabel"), photo.getCaption()).orElse(null);
         if (value == null) {
             return;
         }
@@ -422,9 +454,9 @@ public final class ChildrenScreen implements Refreshable {
     }
 
     private void removePhoto(Photo photo) {
-        if (!Ui.confirmDestructive("Remove this photo?",
-                "The picture will be deleted from the local photos folder. This cannot be undone.",
-                "Remove photo")) {
+        if (!Ui.confirmDestructive(Messages.get("photos.removeTitle"),
+                Messages.get("photos.removeBody"),
+                Messages.get("photos.removeConfirm"))) {
             return;
         }
         context.repo().photos().delete(photo.getId());
@@ -434,7 +466,8 @@ public final class ChildrenScreen implements Refreshable {
     private File chooseImage(String title) {
         FileChooser chooser = new FileChooser();
         chooser.setTitle(title);
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Images",
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                Messages.get("photos.fileFilter"),
                 "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.webp"));
         return chooser.showOpenDialog(shell.window());
     }
@@ -442,7 +475,7 @@ public final class ChildrenScreen implements Refreshable {
     // ---------------------------------------------------------- profile photo
 
     private void chooseProfilePhoto(Child child) {
-        File file = chooseImage("Choose a profile photo");
+        File file = chooseImage(Messages.get("photos.chooseProfilePhoto"));
         if (file == null) {
             return;
         }
@@ -450,21 +483,21 @@ public final class ChildrenScreen implements Refreshable {
             context.repo().setProfilePhoto(child.getId(), file.toPath());
             context.notifyDataChanged();
         } catch (Exception ex) {
-            Ui.error("Could not set the profile photo", ex);
+            Ui.error(Messages.get("photos.couldNotSetProfile"), ex);
         }
     }
 
     private void removeProfilePhoto(Child child) {
-        if (!Ui.confirmDestructive("Remove the profile photo?",
-                "The picture file will be deleted. The child's initials will be shown instead.",
-                "Remove photo")) {
+        if (!Ui.confirmDestructive(Messages.get("photos.removeProfileTitle"),
+                Messages.get("photos.removeProfileBody"),
+                Messages.get("photos.removeConfirm"))) {
             return;
         }
         try {
             context.repo().children().setPhotoFile(child.getId(), null);
             context.notifyDataChanged();
         } catch (RuntimeException ex) {
-            Ui.error("Could not remove the profile photo", ex);
+            Ui.error(Messages.get("photos.couldNotRemoveProfile"), ex);
         }
     }
 
@@ -487,13 +520,17 @@ public final class ChildrenScreen implements Refreshable {
             draft.setStartDate(Dates.toIso(LocalDate.now()));
         }
 
-        Stage dialog = modalStage(creating ? "Add a child" : "Edit profile");
+        Stage dialog = modalStage(creating
+                ? Messages.get("childForm.addTitle")
+                : Messages.get("childForm.editTitle"));
         dialog.setResizable(true);
 
-        TextField firstName = Ui.textField(draft.getFirstName(), "First name", 18);
-        TextField lastName = Ui.textField(draft.getLastName(), "Last name", 18);
+        TextField firstName = Ui.textField(draft.getFirstName(),
+                Messages.get("childForm.firstName"), 18);
+        TextField lastName = Ui.textField(draft.getLastName(),
+                Messages.get("childForm.lastName"), 18);
         DatePicker birth = Ui.datePicker(draft.birthLocalDate());
-        TextField gender = Ui.textField(draft.getGender(), "optional", 12);
+        TextField gender = Ui.textField(draft.getGender(), Messages.get("childForm.genderHint"), 12);
         DatePicker started = Ui.datePicker(Dates.fromIso(draft.getStartDate()));
 
         ComboBox<Group> group = new ComboBox<>();
@@ -503,7 +540,7 @@ public final class ChildrenScreen implements Refreshable {
         group.setConverter(new StringConverter<>() {
             @Override
             public String toString(Group value) {
-                return value == null ? "(no class)" : value.getName();
+                return value == null ? Messages.get("childForm.noClass") : value.getName();
             }
 
             @Override
@@ -519,15 +556,19 @@ public final class ChildrenScreen implements Refreshable {
         }
         group.setPrefWidth(220);
 
-        TextField guardianName = Ui.textField(draft.getGuardianName(), "Parent or guardian", 22);
-        TextField relation = Ui.textField(draft.getGuardianRelation(), "e.g. mother", 14);
-        TextField phone = Ui.textField(draft.getGuardianPhone(), "Phone", 18);
-        TextField email = Ui.textField(draft.getGuardianEmail(), "Email", 22);
-        TextField secondContact = Ui.textField(draft.getSecondContact(), "Name and phone", 26);
-        TextField address = Ui.textField(draft.getAddress(), "Home address", 26);
-        TextField allergies = Ui.textField(draft.getAllergies(), "Allergies or medical notes", 26);
+        TextField guardianName = Ui.textField(draft.getGuardianName(),
+                Messages.get("childForm.guardianHint"), 22);
+        TextField relation = Ui.textField(draft.getGuardianRelation(),
+                Messages.get("childForm.relationHint"), 14);
+        TextField phone = Ui.textField(draft.getGuardianPhone(), Messages.get("childForm.phone"), 18);
+        TextField email = Ui.textField(draft.getGuardianEmail(), Messages.get("childForm.email"), 22);
+        TextField secondContact = Ui.textField(draft.getSecondContact(),
+                Messages.get("childForm.secondContactHint"), 26);
+        TextField address = Ui.textField(draft.getAddress(), Messages.get("childForm.addressHint"), 26);
+        TextField allergies = Ui.textField(draft.getAllergies(),
+                Messages.get("childForm.allergiesHint"), 26);
         TextArea notes = Ui.textArea(draft.getNotes(), 4);
-        notes.setPromptText("Anything else worth remembering about this child");
+        notes.setPromptText(Messages.get("childForm.notesHint"));
 
         Label error = new Label();
         error.getStyleClass().add("form-error");
@@ -535,20 +576,20 @@ public final class ChildrenScreen implements Refreshable {
         error.setManaged(false);
 
         GridPane grid = Ui.formGrid();
-        grid.add(Ui.field("First name", firstName), 0, 0);
-        grid.add(Ui.field("Last name", lastName), 1, 0);
-        grid.add(Ui.field("Date of birth", birth), 0, 1);
-        grid.add(Ui.field("Gender (optional)", gender), 1, 1);
-        grid.add(Ui.field("Class", group), 0, 2);
-        grid.add(Ui.field("First day", started), 1, 2);
-        grid.add(Ui.field("Parent / guardian", guardianName), 0, 3);
-        grid.add(Ui.field("Relationship", relation), 1, 3);
-        grid.add(Ui.field("Phone", phone), 0, 4);
-        grid.add(Ui.field("Email", email), 1, 4);
-        grid.add(Ui.field("Second contact", secondContact), 0, 5, 2, 1);
-        grid.add(Ui.field("Address", address), 0, 6, 2, 1);
-        grid.add(Ui.field("Allergies / medical", allergies), 0, 7, 2, 1);
-        grid.add(Ui.field("Notes", notes), 0, 8, 2, 1);
+        grid.add(Ui.field(Messages.get("childForm.firstName"), firstName), 0, 0);
+        grid.add(Ui.field(Messages.get("childForm.lastName"), lastName), 1, 0);
+        grid.add(Ui.field(Messages.get("childForm.birthDate"), birth), 0, 1);
+        grid.add(Ui.field(Messages.get("childForm.gender"), gender), 1, 1);
+        grid.add(Ui.field(Messages.get("childForm.class"), group), 0, 2);
+        grid.add(Ui.field(Messages.get("childForm.firstDay"), started), 1, 2);
+        grid.add(Ui.field(Messages.get("childForm.guardian"), guardianName), 0, 3);
+        grid.add(Ui.field(Messages.get("childForm.relation"), relation), 1, 3);
+        grid.add(Ui.field(Messages.get("childForm.phone"), phone), 0, 4);
+        grid.add(Ui.field(Messages.get("childForm.email"), email), 1, 4);
+        grid.add(Ui.field(Messages.get("childForm.secondContact"), secondContact), 0, 5, 2, 1);
+        grid.add(Ui.field(Messages.get("childForm.address"), address), 0, 6, 2, 1);
+        grid.add(Ui.field(Messages.get("childForm.allergies"), allergies), 0, 7, 2, 1);
+        grid.add(Ui.field(Messages.get("childForm.notes"), notes), 0, 8, 2, 1);
 
         VBox body = new VBox(12, grid, error);
         body.setPadding(new Insets(16, 18, 8, 18));
@@ -558,12 +599,12 @@ public final class ChildrenScreen implements Refreshable {
             String first = Text.clean(firstName.getText());
             String last = Text.clean(lastName.getText());
             if (first.isEmpty() && last.isEmpty()) {
-                showFormError(error, "Please enter at least a first or last name.");
+                showFormError(error, Messages.get("childForm.error.noName"));
                 firstName.requestFocus();
                 return;
             }
             if (birth.getValue() != null && birth.getValue().isAfter(LocalDate.now())) {
-                showFormError(error, "The date of birth cannot be in the future.");
+                showFormError(error, Messages.get("childForm.error.futureBirth"));
                 return;
             }
             draft.setFirstName(first);
@@ -587,12 +628,13 @@ public final class ChildrenScreen implements Refreshable {
                 context.notifyDataChanged();
                 dialog.close();
             } catch (RuntimeException ex) {
-                Ui.error("Could not save this profile", ex);
+                Ui.error(Messages.get("childForm.error.save"), ex);
             }
         };
 
-        HBox buttons = new HBox(8, Ui.spacer(), Ui.button("Cancel", dialog::close),
-                Ui.primaryButton(creating ? "Add child" : "Save profile", save));
+        HBox buttons = new HBox(8, Ui.spacer(), Ui.button(Messages.get("common.cancel"), dialog::close),
+                Ui.primaryButton(creating ? Messages.get("childForm.save.add")
+                        : Messages.get("childForm.save.edit"), save));
         buttons.setPadding(new Insets(0, 18, 16, 18));
         buttons.setAlignment(Pos.CENTER_RIGHT);
 
@@ -605,10 +647,10 @@ public final class ChildrenScreen implements Refreshable {
     private void openMoveDialog(Child child) {
         List<Group> groups = context.repo().groups().listActive();
         if (groups.isEmpty()) {
-            Ui.warn("No classes available", "Create a class first, then move the child into it.");
+            Ui.warn(Messages.get("moveClass.noClasses"), Messages.get("moveClass.noClassesBody"));
             return;
         }
-        Stage dialog = modalStage("Move " + child.fullName());
+        Stage dialog = modalStage(Messages.get("moveClass.title", child.fullName()));
         ComboBox<Group> combo = new ComboBox<>();
         combo.getItems().addAll(groups);
         combo.setConverter(new StringConverter<>() {
@@ -629,17 +671,16 @@ public final class ChildrenScreen implements Refreshable {
         }
         combo.setPrefWidth(260);
 
-        Label explanation = Ui.meta("Attendance, observations and interviews already recorded keep "
-                + "the class they were written under, so past registers and reports stay accurate.");
+        Label explanation = Ui.meta(Messages.get("moveClass.explain"));
         explanation.setWrapText(true);
         explanation.setMaxWidth(400);
 
-        VBox body = new VBox(12, Ui.field("Move to class", combo), explanation);
+        VBox body = new VBox(12, Ui.field(Messages.get("moveClass.label"), combo), explanation);
         body.setPadding(new Insets(16, 18, 16, 18));
         body.setPrefWidth(440);
 
-        HBox buttons = new HBox(8, Ui.spacer(), Ui.button("Cancel", dialog::close),
-                Ui.primaryButton("Move child", () -> {
+        HBox buttons = new HBox(8, Ui.spacer(), Ui.button(Messages.get("common.cancel"), dialog::close),
+                Ui.primaryButton(Messages.get("moveClass.action"), () -> {
                     if (combo.getValue() == null) {
                         return;
                     }
@@ -654,12 +695,11 @@ public final class ChildrenScreen implements Refreshable {
 
     private void deleteChild(Child child) {
         int records = context.repo().childHistory(child.getId(), null, null, null, null).size();
-        if (!Ui.confirmDestructive("Delete " + child.fullName() + "?",
-                "This removes the profile plus " + Text.plural(records, "record", "records")
-                        + " (attendance, observations, interviews) and all attached photos.\n\n"
-                        + "It cannot be undone. Consider archiving the child instead so the history "
-                        + "is kept for your records.",
-                "Delete permanently")) {
+        String recordCount = Messages.get(records == 1 ? "count.record" : "count.records", records);
+        if (!Ui.confirmDestructive(Messages.get("deleteChild.title", child.fullName()),
+                Messages.get("deleteChild.body", recordCount) + "\n\n"
+                        + Messages.get("deleteChild.body2"),
+                Messages.get("deleteChild.confirm"))) {
             return;
         }
         try {
@@ -668,7 +708,7 @@ public final class ChildrenScreen implements Refreshable {
             context.setCurrentChild(null);
             context.notifyDataChanged();
         } catch (RuntimeException ex) {
-            Ui.error("Could not delete this profile", ex);
+            Ui.error(Messages.get("deleteChild.error"), ex);
         }
     }
 
