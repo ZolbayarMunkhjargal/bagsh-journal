@@ -1,34 +1,48 @@
-Place the application's icons in this folder
-============================================
+The application's icon
+======================
 
-`tools\package.ps1` looks for `assets\icon.ico` and, when it finds it, uses that
-picture for the packaged program and for the installer. Without it, jpackage
-supplies its own default icon and everything still works.
+`icon.ico` and `icon.png` in this folder are **generated** - do not edit them by
+hand. They are drawn by:
 
-To add your own icon
---------------------
+    python tools\make_icon.py
 
-1. Draw or export the picture as PNG, at least 256 x 256 pixels.
-2. Convert it to a Windows `.ico` file containing at least these sizes:
-   16, 32, 48, 64, 128 and 256 pixels. Any icon editor can do this; on Windows,
-   a quick way is to use an online converter or ImageMagick:
+The design is a teal notebook cover with a cream page, ruled lines, binder rings
+down the spine and a small red bookmark ribbon, using the same palette as the
+application window. Every measurement is a fraction of the icon size, so the same
+code draws all seven sizes Windows asks for - 16, 24, 32, 48, 64, 128 and 256 -
+and the small ones stay legible rather than turning to mush.
 
-       magick icon.png -define icon:auto-resize=256,128,64,48,32,16 icon.ico
+`tools\package.ps1` picks `icon.ico` up automatically and uses it for the
+program, the shortcut and (if an installer is built) the installer. It prints
 
-3. Save it here as:
+    icon: ...\assets\icon.ico
 
-       assets\icon.ico
+when it finds it. Without the file, jpackage supplies a default icon and
+everything still works.
 
-4. Run `package.bat` again. The packaging step prints
+Changing the design
+-------------------
 
-       icon: ...\assets\icon.ico
+Edit `tools\make_icon.py` and run it again:
 
-   when it picks the file up.
+    python tools\make_icon.py
 
-Notes
------
+Two things are worth keeping in mind:
 
-- Only `.ico` is used, because the target is a Windows application. If the project
-  is ever packaged for another system, a PNG of at least 512 x 512 would be added
-  here as well.
-- The icon is optional. Leaving this folder empty is perfectly fine.
+- **Draw at large sizes, then look at 16 and 32 pixels.** Details that read
+  nicely at 256 disappear or smear at 16. That is why the ruled lines are only
+  drawn at 32 pixels and above.
+- **Keep large, high-contrast shapes.** The ribbon started out much wider and
+  ran down into the text, which made it look like a red smear at small sizes; it
+  now sits flush with the page edge and stops above the first ruled line.
+
+Using a different icon
+----------------------
+
+Replace `assets\icon.ico` with any `.ico` containing at least 16, 32, 48, 64, 128
+and 256 pixel images, then run `package.bat`. ImageMagick can convert a PNG:
+
+    magick icon.png -define icon:auto-resize=256,128,64,48,32,16 icon.ico
+
+Only `.ico` is used, because the target is a Windows application. `icon.png` is
+written alongside it for the README and for anyone packaging on another system.

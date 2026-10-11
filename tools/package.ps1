@@ -7,6 +7,7 @@
 #   tools\package.ps1 -Installer           build the installer without asking
 #   tools\package.ps1 -NoInstaller         app folder only
 #   tools\package.ps1 -Zip                 also write a .zip of the app folder
+#   tools\package.ps1 -DataDir D           make the shortcut keep its records in D
 
 [CmdletBinding()]
 param(
@@ -14,7 +15,8 @@ param(
     [switch]$NoInstaller,
     [switch]$Zip,
     [string]$AppName = 'KinderJournal',
-    [string]$Version = '1.0.0'
+    [string]$Version = '1.0.0',
+    [string]$DataDir
 )
 
 $ErrorActionPreference = 'Stop'
@@ -133,8 +135,7 @@ $jpArgs = @(
     '--java-options', '-Djava.io.tmpdir=$ROOTDIR\temp',
     '--dest', $staging,
     '--vendor', 'KinderJournal',
-    '--description', 'A local journal for kindergarten teachers: attendance, observations, interviews, planning and printable reports.',
-    '--win-console'
+    '--description', 'A local journal for kindergarten teachers: attendance, observations, interviews, planning and printable reports.'
 )
 # A friendly icon is used when the project provides one.
 $icon = Join-Path $root 'assets\icon.ico'
@@ -158,23 +159,87 @@ $exe = Join-Path $appImage "$AppName.exe"
 New-Item -ItemType Directory -Force -Path (Join-Path $appImage 'temp') | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $appImage 'runtime\temp') | Out-Null
 
+# --- A shortcut to click, so the teacher never has to find the .exe ----------
+# The program is a window with no console, so the folder holds one thing that
+# looks like an application: this shortcut. It is placed beside the executable
+# rather than on the desktop, because a desktop shortcut would break the moment
+# the folder was moved to another computer.
+Write-Step 'Creating a shortcut to click'
+$shortcutPath = Join-Path $appImage "$AppName.lnk"
+try {
+    $shell = New-Object -ComObject WScript.Shell
+    $link = $shell.CreateShortcut($shortcutPath)
+    $link.TargetPath = $exe
+    $link.WorkingDirectory = $appImage
+    $link.Description = 'KinderJournal - kindergarten journal'
+    # Records normally live in %APPDATA%; -DataDir pins them somewhere else,
+    # which is what a school keeping the journal on a shared drive would want.
+    if ($DataDir) {
+        $link.Arguments = "--data-dir `"$([System.IO.Path]::GetFullPath($DataDir))`""
+        Write-Ok "records folder: $($link.Arguments)"
+    }
+    $link.IconLocation = if (Test-Path $icon) { "$icon,0" } else { "$exe,0" }
+    $link.Save()
+    [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($shell)
+    Write-Ok "shortcut: $AppName.lnk"
+} catch {
+    Write-Host "    could not create the shortcut: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
+# A one-line launcher, for anyone who prefers a script or needs to pass options.
+$cmd = @"
+@echo off
+rem Starts KinderJournal without a console window.
+start "" "%~dp0$AppName.exe" %*
+"@
+Set-Content -Path (Join-Path $appImage 'Start KinderJournal.cmd') -Value $cmd -Encoding ASCII
+
+# A real .lnk beside the executable cannot be moved with the folder - a
+# shortcut's target is an absolute path - so a portable VBScript launcher is
+# also written. Windows' CreateShortcut method is available from either.
+$portable = @"
+' Creates a shortcut to KinderJournal on the Desktop.
+' Useful when the folder has been copied to another computer, which would have
+' left KinderJournal.lnk pointing at the old location.
+Set shell = CreateObject("WScript.Shell")
+Set link = shell.CreateShortcut(shell.SpecialFolders("Desktop") & "\$AppName.lnk")
+link.TargetPath = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName) & "\$AppName.exe"
+link.WorkingDirectory = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
+link.Description = "$AppName - kindergarten journal"
+link.IconLocation = link.TargetPath & ",0"
+link.Save
+MsgBox "A shortcut to $AppName has been placed on your Desktop.", 64, "$AppName"
+"@
+Set-Content -Path (Join-Path $appImage 'Put a shortcut on my Desktop.vbs') -Value $portable -Encoding ASCII
+
 # A plain-text note beside the executable: the folder is meant to be handed over.
 $guide = @"
 $AppName $Version
 $('=' * ($AppName.Length + $Version.Length + 1))
 
-To start the program, double-click $AppName.exe in this folder.
+TO START THE PROGRAM
+    Double-click  $AppName.lnk  (the one with the journal icon).
 
-Your records are NOT stored in this folder. They live in:
-    %APPDATA%\$AppName
-which is where the program reads and writes everything, including photos.
+    Do not worry about $AppName.exe - it is the same program, but it is the
+    technical file. The shortcut is there so you do not have to go looking.
 
-To move to another computer, copy this whole folder AND use
-"Data & backup" inside the program to create a backup file, then restore
-that backup on the new computer.
+WHERE YOUR RECORDS ARE KEPT
+    Not in this folder. They live in:
+        %APPDATA%\$AppName
+    and that is where the program reads and writes everything, including photos.
 
-Everything stays on the computer you run it on: there is no account,
-no synchronisation and no internet connection is used.
+MOVING TO ANOTHER COMPUTER
+    1. Copy this whole folder across.
+    2. Inside the program, use "Data & backup" to create a backup file.
+    3. On the new computer, open the program and restore that backup.
+
+PRIVACY
+    Everything stays on the computer you run it on. There is no account, no
+    synchronisation, and no internet connection is used at any point.
+
+SOMETHING WRONG?
+    The program shows a message box if it cannot start. Details are also written
+    to  %APPDATA%\$AppName\logs\kinderjournal.log
 "@
 Set-Content -Path (Join-Path $appImage 'READ ME FIRST.txt') -Value $guide -Encoding UTF8
 
@@ -218,8 +283,7 @@ if ($wantInstaller) {
         '--win-menu',
         '--win-shortcut',
         '--win-dir-chooser',
-        '--win-menu-group', $AppName,
-        '--win-console'
+        '--win-menu-group', $AppName
     )
     if (Test-Path $icon) { $installerArgs += @('--icon', $icon) }
 

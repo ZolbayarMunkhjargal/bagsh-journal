@@ -59,11 +59,24 @@ developer instructions below to make one).
 
 1. Copy the `KinderJournal` folder onto the computer, for example into
    `Documents`.
-2. Double-click **`KinderJournal.exe`**.
+2. Double-click **`KinderJournal.lnk`** - the one with the journal icon.
 3. Read `READ ME FIRST.txt` in the same folder - it repeats the important points
    about where your data is kept.
 
 No Java installation is required: the folder carries its own runtime.
+
+**The program is a window, not a console.** `KinderJournal.exe` is built as a
+Windows GUI program, so no black command window appears while it runs and none
+flashes when it starts. It reports problems in a message box and in
+`logs\kinderjournal.log`; there is nothing for it to print to a console.
+
+Three files in the folder mean you never have to go looking for the executable:
+
+| File | What it is for |
+| --- | --- |
+| `KinderJournal.lnk` | The one to double-click. |
+| `Put a shortcut on my Desktop.vbs` | Run once after copying the folder to another computer. A shortcut stores an absolute path, so the packaged one still points at the original location; this puts a correct shortcut on the Desktop for the copy you are using. |
+| `Start KinderJournal.cmd` | For anyone who prefers a script, or needs to pass options such as an alternative records folder. |
 
 If it is your first time, the Dashboard offers to create a class. A class holds
 the children; everything else hangs off the child.
@@ -111,24 +124,47 @@ package.bat -Zip
 This compiles the sources, bundles them with a trimmed Java runtime (including
 JavaFX and the SQLite native library), and writes the result to
 `release\KinderJournal-1.0.0-windows`. That folder is self-contained: a teacher
-double-clicks `KinderJournal.exe` and needs nothing else installed. `-Zip` also
-writes a `.zip` of the folder, and `-Installer` (or answering yes when prompted)
-builds an `.msi` that adds Start Menu entries.
+double-clicks `KinderJournal.lnk` and needs nothing else installed. `-Zip` also
+writes a `.zip` of the folder.
 
-An icon is optional: drop `assets\icon.ico` in place and it is used for the
-program and the installer. See `assets\README.txt`.
+The program icon comes from `assets\icon.ico`, which `tools\make_icon.py`
+generates; re-run that script after editing it. It is used for the executable,
+the shortcut and (if an installer is ever built) the installer.
 
-**A note on why packaging needs care.** Two things about a double-clicked
-Windows program are easy to get wrong, and both are handled by
-`tools\package.ps1`:
+```bat
+package.bat -NoInstaller -Zip              :: the folder and a zip
+package.bat -DataDir D:\KinderJournal      :: shortcut keeps records in D:
+package.bat -Installer                      :: a Windows installer (needs WiX)
+```
 
-- The bundled runtime must include `java.sql` and `java.desktop` in addition to
-  the JavaFX modules, or the program starts and then fails the first time it
-  saves.
+#### About the installer
+
+An `.msi` gives Start Menu and Desktop entries plus an entry in *Add or remove
+programs*, and needs the **WiX Toolset** installed - jpackage refuses to build
+`msi` or `exe` installers without it. If `package.bat -Installer` reports that
+jpackage failed, install WiX and try again:
+
+```powershell
+Start-Process -FilePath .\.tools\wix314.exe -ArgumentList "/install","/quiet","/norestart" -Verb RunAs -Wait
+```
+
+For a single computer the folder and its shortcut are enough, which is why the
+shortcut is created either way.
+
+**Two things about a double-clicked Windows program are easy to get wrong**, and
+`tools\package.ps1` handles both:
+
+- The runtime must include `java.sql` and `java.desktop` alongside the JavaFX
+  modules, or the program starts and then fails the first time it saves.
 - The SQLite driver normally unpacks its own native library into the temporary
   folder on first use. A program launched from a shortcut is not always given a
   writable temporary folder, so the packaging step extracts that library next to
   the executable, where the driver finds it immediately.
+
+A third one is worth knowing because it is invisible until someone looks:
+`--win-console` makes the executable a console program, which shows a black
+window and routes the program's output there instead of to a message box. The
+packaging script does not pass it.
 
 ---
 
