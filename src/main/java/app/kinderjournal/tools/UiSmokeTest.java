@@ -13,6 +13,7 @@ import app.kinderjournal.report.ReportType;
 import app.kinderjournal.ui.AppContext;
 import app.kinderjournal.ui.MainShell;
 import app.kinderjournal.ui.Styles;
+import app.kinderjournal.ui.Ui;
 
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -205,6 +206,8 @@ public final class UiSmokeTest {
 
             checkNothingIsWiderThanTheWindow(scene, shell, keys);
 
+            checkAvatarsAreRoundAndFilled();
+
             checkEveryReportType(repo);
         } catch (Throwable ex) {
             fail("smoke test aborted: " + ex);
@@ -295,10 +298,25 @@ public final class UiSmokeTest {
             check("sample data has a class and a child", false);
             return;
         }
-        Group group = groups.get(0);
-        Child child = children.get(0);
         LocalDate to = LocalDate.now();
         LocalDate from = to.minusMonths(2);
+
+        // The class that actually has records, chosen by what is in it rather than
+        // by position or by the last_group_id setting: earlier checks in this run
+        // create an empty test class, and a report rendered against that would be
+        // full of "no children" notices and look like a fault in the renderer.
+        Group group = null;
+        for (Group candidate : groups) {
+            if (!repo.children().listByGroup(candidate.getId(), false).isEmpty()
+                    && !repo.attendance().listForGroup(candidate.getId(), from, to).isEmpty()) {
+                group = candidate;
+                break;
+            }
+        }
+        if (group == null) {
+            group = groups.get(0);
+        }
+        Child child = children.get(0);
 
         for (ReportType type : ReportType.values()) {
             ReportOptions options = ReportOptions.builder(type)
@@ -324,6 +342,14 @@ public final class UiSmokeTest {
                 }
                 check("report has content: " + type.label(),
                         html.contains("<h2>") || html.contains("<table"));
+                if (!(html.contains("<h2>") || html.contains("<table"))) {
+                    System.out.println("        " + type.label() + " rendered only: "
+                            + HtmlPreview.plainText(html).strip().substring(0,
+                                    Math.min(140, HtmlPreview.plainText(html).strip().length())));
+                    System.out.println("        asked for group=" + group.getId() + " ("
+                            + group.getName() + ") child=" + child.getId() + " range "
+                            + from + ".." + to);
+                }
                 check("report reads as text: " + type.label(),
                         HtmlPreview.plainText(html).length() > 40);
             } catch (Throwable ex) {
@@ -473,6 +499,47 @@ public final class UiSmokeTest {
             sb.append(' ').append(node.getStyleClass());
         }
         return sb.toString();
+    }
+
+    /**
+     * Checks that a child avatar is a centred circle filled by its picture.
+     *
+     * <p>Two faults made these look broken, and neither threw: the circular clip
+     * was centred on the pane's corner rather than its middle, so only a
+     * quarter-disc was visible, and the picture was scaled to fit inside the frame
+     * instead of cropped to fill it, so a wide photo shrank to a thin strip. Both
+     * are geometry, so both can be asserted.
+     */
+    private void checkAvatarsAreRoundAndFilled() {
+        app.kinderjournal.model.Child child = new app.kinderjournal.model.Child();
+        child.setFirstName("Anna");
+        child.setLastName("Berg");
+        double radius = 34;
+        javafx.scene.layout.StackPane avatar = Ui.avatar(child, radius);
+
+        javafx.scene.Node clip = avatar.getClip();
+        boolean centred = clip instanceof javafx.scene.shape.Circle circle
+                && Math.abs(circle.getCenterX() - radius) < 0.01
+                && Math.abs(circle.getCenterY() - radius) < 0.01
+                && Math.abs(circle.getRadius() - radius) < 0.01;
+        check("avatar clip is a circle centred on the avatar", centred);
+
+        // The initials fallback must fill the frame too, not sit at its corner.
+        check("avatar shows a placeholder when there is no photo",
+                !avatar.getChildren().isEmpty());
+
+        // Cropping: a wide picture must be cropped to the frame's shape, which is
+        // the whole point - a viewport, not letterboxing.
+        javafx.scene.image.Image wide = new javafx.scene.image.WritableImage(120, 40);
+        javafx.scene.image.ImageView view = Ui.cover(wide, 64, 64);
+        javafx.geometry.Rectangle2D crop = view.getViewport();
+        check("a wide photo is cropped square to fill the frame",
+                crop != null && Math.abs(crop.getWidth() - crop.getHeight()) < 0.01);
+        check("the crop keeps the middle of the picture",
+                crop != null && Math.abs(crop.getMinX() - 40) < 0.01);
+        check("the crop fills the frame", view.getFitWidth() == 64 && view.getFitHeight() == 64);
+        check("the view does not letterbox on top of the crop",
+                !view.isPreserveRatio());
     }
 
     /** Every ScrollPane in a node tree. */

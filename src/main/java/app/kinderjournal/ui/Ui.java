@@ -7,6 +7,7 @@ import app.kinderjournal.util.AppPaths;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -278,14 +279,12 @@ public final class Ui {
         Node content = null;
         if (child != null && child.getPhotoFile() != null && AppPaths.photoExists(child.getPhotoFile())) {
             try {
+                // Loaded at the frame size, then cropped to fill it: a portrait or
+                // landscape snapshot must fill the circle, not shrink within it.
                 Image image = new Image(AppPaths.photoFile(child.getPhotoFile()).toUri().toString(),
-                        radius * 2, radius * 2, true, true, true);
+                        radius * 2, radius * 2, false, true, true);
                 if (!image.isError()) {
-                    ImageView view = new ImageView(image);
-                    view.setFitWidth(radius * 2);
-                    view.setFitHeight(radius * 2);
-                    view.setPreserveRatio(true);
-                    content = view;
+                    content = cover(image, radius * 2, radius * 2);
                 }
             } catch (RuntimeException ignored) {
                 // Fall through to the initials placeholder.
@@ -298,7 +297,13 @@ public final class Ui {
                             child == null ? "?" : child.fullName(), AVATAR_CLASSES.length)]);
             content = initials;
         }
-        Circle clip = new Circle(radius);
+        // The clip is a piece of geometry, not a layout child, so it is NOT centred
+        // by the StackPane: a bare Circle(radius) sits with its centre on the pane's
+        // top-left corner, and the circle is then anchored at (-radius, -radius).
+        // That left only the bottom-right quarter-disc visible, which is why the
+        // avatar looked like a small wedge in the corner of the frame. Move it to
+        // the middle of the pane.
+        Circle clip = new Circle(radius, radius, radius);
         pane.setClip(clip);
         pane.getChildren().add(content);
         pane.getStyleClass().add("avatar-clip");
@@ -337,7 +342,7 @@ public final class Ui {
 
     /** An ImageView sized to fit, or a "photo missing" placeholder label. */
     public static Node imageOrPlaceholder(String storedFile, double width, double height) {
-        Image image = loadImage(storedFile, width);
+        Image image = loadImage(storedFile, Math.max(width, height));
         if (image == null) {
             Label missing = new Label(Messages.get("reports.photoMissing"));
             missing.getStyleClass().add("photo-missing");
@@ -345,10 +350,46 @@ public final class Ui {
             missing.setAlignment(Pos.CENTER);
             return missing;
         }
+        return cover(image, width, height);
+    }
+
+    /**
+     * Fills a box with an image, cropping the overhang, rather than fitting the
+     * whole image inside it.
+     *
+     * <p>Scaling a picture down until it fits leaves empty bands: a 30x20 sample
+     * placed in a square frame became 30x30, so it occupied less than half the
+     * width and the frame looked broken rather than letterboxed. Cropping to fill
+     * is what a photo frame is expected to do, and it is what the circular child
+     * avatar needs - a face should fill the circle, not shrink inside it.
+     */
+    public static ImageView cover(Image image, double width, double height) {
         ImageView view = new ImageView(image);
         view.setFitWidth(width);
-        view.setPreserveRatio(true);
+        view.setFitHeight(height);
+        // The ratio is preserved by the crop below, so the view must not add its
+        // own letterboxing on top of it.
+        view.setPreserveRatio(false);
         view.setSmooth(true);
+
+        double sourceWidth = image.getWidth();
+        double sourceHeight = image.getHeight();
+        if (sourceWidth <= 0 || sourceHeight <= 0 || width <= 0 || height <= 0) {
+            return view;
+        }
+        // The largest centred region of the source with the frame's proportions.
+        double targetRatio = width / height;
+        double sourceRatio = sourceWidth / sourceHeight;
+        double cropWidth = sourceWidth;
+        double cropHeight = sourceHeight;
+        if (sourceRatio > targetRatio) {
+            cropWidth = sourceHeight * targetRatio;
+        } else {
+            cropHeight = sourceWidth / targetRatio;
+        }
+        view.setViewport(new Rectangle2D(
+                (sourceWidth - cropWidth) / 2, (sourceHeight - cropHeight) / 2,
+                cropWidth, cropHeight));
         return view;
     }
 

@@ -122,7 +122,7 @@ public final class PhotosPanel {
         tile.setPrefWidth(TILE_WIDTH);
         tile.setMaxWidth(TILE_WIDTH);
 
-        Image image = Ui.loadImage(photo.getFile(), TILE_WIDTH - 16);
+        Image image = Ui.loadImage(photo.getFile(), Math.max(TILE_WIDTH - 16, THUMB_HEIGHT));
         if (image == null) {
             Label missing = new Label(Messages.get("photos.missing"));
             missing.getStyleClass().add("photo-missing");
@@ -131,11 +131,9 @@ public final class PhotosPanel {
             missing.setWrapText(true);
             tile.getChildren().add(missing);
         } else {
-            ImageView view = new ImageView(image);
-            view.setFitWidth(TILE_WIDTH - 16);
-            view.setFitHeight(THUMB_HEIGHT);
-            view.setPreserveRatio(true);
-            view.setSmooth(true);
+            // Cropped to fill the tile, so a wide snapshot is not left sitting in
+            // a mostly empty frame.
+            ImageView view = Ui.cover(image, TILE_WIDTH - 16, THUMB_HEIGHT);
             Rectangle clip = new Rectangle(TILE_WIDTH - 16, THUMB_HEIGHT);
             clip.setArcWidth(8);
             clip.setArcHeight(8);

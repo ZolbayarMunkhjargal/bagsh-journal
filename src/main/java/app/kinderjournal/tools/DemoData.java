@@ -36,9 +36,13 @@ public final class DemoData {
         System.setProperty("kinderjournal.dataDir", dataDir.toAbsolutePath().toString());
         int written = 0;
         try (Repository repo = Repository.open()) {
-            Group sunflowers = group(repo, "Sunflower group", "4\u20135", "Room 2", "2025/2026");
-            Group acorns = group(repo, "Acorn group", "3\u20134", "Room 1", "2025/2026");
+            Group sunflowers = group(repo, "Sunflower group", "4\u20135", "Room 2", "2025/2026", 1);
+            Group acorns = group(repo, "Acorn group", "3\u20134", "Room 1", "2025/2026", 2);
             written += 2;
+            // Start on the group that has the term's records. The classes are
+            // ordered by sort_order and then by name, so without this the sample
+            // data opened on the nearly empty group and looked unpopulated.
+            repo.db().saveSetting("last_group_id", String.valueOf(sunflowers.getId()));
 
             List<Child> children = List.of(
                     child(repo, sunflowers, "Anna", "Berg", "2020-03-12", "Maria Berg", "mother",
@@ -228,7 +232,9 @@ public final class DemoData {
             repo.plans().insert(template);
             written++;
 
-            // A couple of photos on the first child's observation.
+            // A couple of photos on the first child's observation, and a profile
+            // picture for the child: without one the avatar falls back to initials,
+            // so the circular crop would never be exercised by the sample data.
             List<Observation> observations = repo.observations()
                     .listForChild(children.get(0).getId(), null, null, null);
             if (!observations.isEmpty()) {
@@ -236,8 +242,11 @@ public final class DemoData {
                 try {
                     repo.photos().add(Photo.OwnerType.OBSERVATION, observations.get(0).getId(),
                             children.get(0).getId(), image, "Ordering the story cards");
-                    repo.photos().add(Photo.OwnerType.CHILD, children.get(0).getId(),
-                            children.get(0).getId(), image, "Profile picture");
+                    Photo profile = repo.photos().add(Photo.OwnerType.CHILD,
+                            children.get(0).getId(), children.get(0).getId(), image,
+                            "Profile picture");
+                    children.get(0).setPhotoFile(profile.getFile());
+                    repo.children().update(children.get(0));
                     written += 2;
                 } catch (IOException ex) {
                     throw new IllegalStateException("Could not attach the sample photos", ex);
@@ -249,7 +258,8 @@ public final class DemoData {
         return written;
     }
 
-    private static Group group(Repository repo, String name, String ages, String room, String year) {
+    private static Group group(Repository repo, String name, String ages, String room, String year,
+                               int order) {
         Group existing = repo.groups().findByName(name);
         if (existing != null) {
             return existing;
@@ -260,13 +270,27 @@ public final class DemoData {
         group.setRoom(room);
         group.setSchoolYear(year);
         group.setTeacher("Ms Teacher");
+        group.setSortOrder(order);
         group.setDescription("A sample class created for trying the application out.");
         repo.groups().insert(group);
         return group;
     }
 
+    /**
+     * Creates a sample child.
+     *
+     * <p>Idempotent, like {@link #group}: the sample data is seeded by hand on a
+     * folder that may already hold it, and re-running must not produce a second
+     * copy of every child.
+     */
     private static Child child(Repository repo, Group group, String first, String last, String birth,
                                String guardian, String relation, String phone, String allergies) {
+        for (Child existing : repo.children().listAll()) {
+            if (existing.getFirstName().equals(first) && existing.getLastName().equals(last)
+                    && existing.getGroupId() == group.getId()) {
+                return existing;
+            }
+        }
         Child child = new Child();
         child.setFirstName(first);
         child.setLastName(last);
@@ -317,36 +341,27 @@ public final class DemoData {
         return staging;
     }
 
-    /** A 30x20 PNG gradient, so the photo features can be exercised without a file to hand. */
+    /**
+     * A 64x64 PNG of a simple figure, so the photo features can be exercised
+     * without a file to hand.
+     *
+     * <p>Square on purpose. The earlier sample was 30x20, a shape no camera
+     * produces, and it hid a real fault: a picture whose shape differs from its
+     * frame was being scaled to fit rather than cropped to fill, so a wide image
+     * sat in a mostly empty circle or tile. A test image of the wrong shape is
+     * worth keeping for exactly that reason - {@code tools} can write a wide one
+     * by hand when the crop needs checking.
+     */
     private static final byte[] SAMPLE_PNG = java.util.Base64.getDecoder().decode(
-            "iVBORw0KGgoAAAANSUhEUgAAAB4AAAAUCAIAAAAVyRqTAAAFzUlEQVR42g3MzaqyTAAA4C4n"
-            + "RAgJJIKIIEKQCEICiUBCCAnen87JJhunxhyrqTPnxw/cuHDjwo0LNy7cuHDjwnv63ucCnlYb"
-            + "/OLALx787oA/AvjbBTsR7HrgrQ/eB2A/BOYImGNwmAAggaMMrCmwZuA0B1AB9gIgFaAlOK/A"
-            + "RQN4DRwdOBtwNYC7BaTVhr84+JuHfzrwrwB3XbgT4VsPvvfhfgDNITRH8DCGYAKPErRkaE3h"
-            + "aQbhHNoKRAuIVHhewssKYg06a+jo8LqBrgHJFnqtNv7N4T88/tvBOwHvuvhNxO89vO9jc4DN"
-            + "IT6MMBjj4wRbErZkfJpiOMP2HCMFowU+q/iyxHiFHQ07a3zVsbvBxMDeFv+ryR+O/OXJrkN2"
-            + "AnnrkneR7HvE7BNzQA5DAkbkOCbWhFgSOckETok9I2hOkELOC3JRCV4SZ0UcjVzXxNUJ2RDP"
-            + "IN6W3Fpt+pejO57uOvRNoO9duhep2aNmnx4GFAzpcUStMbUm9CRRKFN7StGMojk9K/SyoFil"
-            + "zpI6K3rVqLumRKfehnoGvW3pvdVmO47tePbWYe8C23eZKTKzxw59BgbsOGTWiFljdpowKDFb"
-            + "ZmjK0Iyd5+yiMLxgjsqcJbuumKsxsmaezrwNuxnsvmWPVtvfcf4b7793/L3gm13fFP1Dzwd9"
-            + "/zjwraFvjfzT2IcT35Z8JPto6p9n/mXuY8V3Fr6j+tel7658ovne2vd0/7bx74b/2Pq01Q7e"
-            + "uOCdD/adwBQCsxscxAD0gmM/sAaBNQxOowCOA3sSIClAcnCeBpdZgOeBowTOIriqgbsMyCrw"
-            + "tMBbBzc9uG+ChxHQbfCvDt+5cM+HZic0hfDQDYEYHnuh1Q+tQXgahnAU2uMQTUIkhWc5vExD"
-            + "PAudeego4XURumpIlqG3Cj0tvK3Dux4+NiE1QroNn612tOcik4/MTnQQItCNjmJk9SKrH50G"
-            + "ERxG9ihC4whNorMUXeQITyNnFjnz6KpE7iIiauQtI28V3bTovo4eekQ3ETWi5zZ6tdqxycUm"
-            + "Hx86MRDiYze2xNjqxad+DAexPYzRKEbj+DyJL1KM5diZxs4svs5jV4nJIvbU2FvGt1V81+LH"
-            + "OqZ6TDfx04hf2/ij1U5MLjnwCegkRyGxuoklJqdeAvuJPUjQMEGj5DxOLpMES4kjJ840uc4S"
-            + "d54QJfEWiacmt2VyXyUPLaHrhOrJc5O8jORjm7BWOz1wKeDTYye1hNTqpicxhb3U7qdokKJh"
-            + "eh6ll3GKJ6kjpY6cXqepO0vJPPWU1FukNzW9L9PHKqVaStfpU09fm/TDSNk2/VdngMuOfGZ1"
-            + "MkvITt0Mipndy1A/Q4PsPMwuowyPM2eSOVJ2lTN3mpFZ5s0zT8lui+yuZo9lRlcZ1bLnOnvp"
-            + "2ccmY0bGttlnq50fudzic6uTn4QcdnNbzFEvR/38PMgvwxyPcmecO5P8KuWunJNp7s1yb57f"
-            + "lPy+yB9qTpc5XeVPLX+t8w89Z5ucGfnnNv9qtQuLKyy+OHUKKBR2t0BigXrFuV9cBgUeFs6o"
-            + "cMbFdVK4UkHkwpsW3qy4zYu7UjwWBVULuiyeq+KlFR/rgukF2xSfRvG1Lb5b7dLiyhNfwk5p"
-            + "CyXqlkgsz73y0i/xoHSGpTMqr+PSnZREKj259KblbVbe5+VDKemipGr5XJavVfmhlWxdMr38"
-            + "3JRfRvm9LX9a7erEVZCv7E6FhAp1q7NYXXoV7lfOoHKG1XVUueOKTCpPqjy5uk2r+6x6zCuq"
-            + "VHRRPdXqtaw+VhXTKrauPvXqa1N9G9XPtvpX15Crbb5GnRoJ9blbX8Qa92qnXzuD+jqs3VFN"
-            + "xrU3qT2pvsn1fVo/ZjWd11Spn4v6pdYfy5qtaqbVn+v6S6+/N/WPUf9sa7/VbmyuQXyDOs1Z"
-            + "aC7dBouN02ucfnMdNO6wIaPGGzfepLlJzV1uHtOGzho6b55K81o0H2rDlg1bNZ9a87VuvvXm"
-            + "Z9P8GI2/bf77H0jUVy6r4pmIAAAAAElFTkSuQmCC");
+            "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABxElEQVR42u1bu27DMAyMDgnQ"
+            + "sUu/s2OWjl0y9ju7ZCyQwZ0KFIYd63FHyjK12pDujhQtkXSapul05IHTwUcIcHQBzpaLvV7f"
+            + "swPO/faVLDAlZRAsIewliEQAJnG1EFQBlMRVQlAEsCTOFgJ7Js9YH3smz8BRtQV6Ic7YEhiJ"
+            + "fA0+jES+BmfcBUazfilejEi+BDdGJZ+LP2LAyNbP4XH2APT9eVt99vZxNcWyehJUWP8ZcQsh"
+            + "lk6J6MHqjPepMYBt/VoybBGWeKE3y1t7AnombyFCnANU+59tNdZ8c37hASFACBAChAAhgGCw"
+            + "LzOqW2J4gHJyltWUOQK5B7SCVydIYNGIUEvCIiliFgNKyVilxkxzgn+kesoJuiRFl4SwJv50"
+            + "C1h0aM29wCIH6JoUzSFrlQjNEkDlBVskVSKs8UEvBREvT0AP3ZqebTNRGLFoSPQsjGzhh7oZ"
+            + "0bMwkoMbyo5Mz8JILl70XhVSxwQoVFWBzZ23xFvBdi119N6av3SrNnWLz8tMlgeY+eWpNlCD"
+            + "9YmxPsf/X6/lK0X5X+Dx+HFrprpcXlJkhT0F8LQ+Y33smTwDB/ZOvhUPRiDfggujkK/Fl47+"
+            + "+/wv83oYAq7z3voAAAAASUVORK5CYII=");
 
 }

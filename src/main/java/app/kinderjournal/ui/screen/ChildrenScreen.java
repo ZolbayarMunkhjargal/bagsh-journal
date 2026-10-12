@@ -202,7 +202,7 @@ public final class ChildrenScreen implements Refreshable {
                 child.getGroupName().isBlank() ? Messages.get("classes.noClassWord")
                         : child.getGroupName(),
                 child.isArchived() ? Messages.get("classes.archived") : "");
-        return RecordList.selectableRow(Ui.avatar(child, 16), child.fullName(), subtitle,
+        return RecordList.selectableRow(Ui.avatar(child, 20), child.fullName(), subtitle,
                 ReportsScreenSupport.childrenBadge(context, child), selected, () -> {
                     selectedChildId = child.getId();
                     context.setCurrentChild(child);
