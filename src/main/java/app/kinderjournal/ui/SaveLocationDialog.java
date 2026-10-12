@@ -105,7 +105,10 @@ public final class SaveLocationDialog {
         Button cancel = Ui.button(Messages.get("common.cancel"), this::close);
         Button browse = Ui.button(Messages.get("format.browse"), this::browse);
 
-        places.setPrefHeight(120);
+        // Tall enough for the usual places and the drives, so the list is not cut
+        // off at four entries as it was with a fixed 120 pixels.
+        places.setPrefHeight(190);
+        places.setMinHeight(190);
         places.getItems().setAll(placeNames());
         places.getSelectionModel().selectedIndexProperty().addListener(
                 (observable, old, now) -> {
@@ -236,10 +239,21 @@ public final class SaveLocationDialog {
     /**
      * Works out what to tell the teacher about a folder.
      *
-     * <p>Separate from the dialog so it can be tested without showing one. Returns
-     * true when the folder is a problem, and writes the sentence to explain it.
+     * <p>This is advice, not a veto, and the distinction matters.
+     * {@code Files.isWritable} is only an estimate: it can report false for a folder
+     * the program can write to perfectly well, because it judges the folder's
+     * permissions rather than what happens when a file is actually created. While it
+     * was treated as a veto, the dialog refused to save into Documents, Desktop and
+     * Downloads on a computer where writing to all three works.
+     *
+     * <p>So a folder that merely looks unwritable is flagged as a warning and the
+     * save is still allowed to go ahead. The truth comes from writing the file: if
+     * Windows refuses, its own reason is shown in full.
+     *
+     * <p>Public so the interface tests can check the advice without showing a dialog.
+     *
+     * @return true when the folder is plainly unusable - empty, malformed, or a file
      */
-    /** Public so the interface tests can check the advice without showing a dialog. */
     public static boolean describeFolder(String text, Label target) {
         if (text == null || text.isBlank()) {
             target.setText(Messages.get("format.enterFolder"));
@@ -253,13 +267,14 @@ public final class SaveLocationDialog {
             return true;
         }
         if (Files.isDirectory(folder)) {
-            Path blocked = firstUnwritable(folder);
-            if (blocked == null) {
+            Path doubtful = firstUnwritable(folder);
+            if (doubtful == null) {
                 target.setText(Messages.get("format.canSaveHere", folder.toString()));
-                return false;
+            } else {
+                // A warning rather than a refusal: only writing tells the truth.
+                target.setText(Messages.get("format.mayNotWriteHere", doubtful.toString()));
             }
-            target.setText(Messages.get("format.cannotWriteHere", blocked.toString()));
-            return true;
+            return false;
         }
         if (Files.exists(folder)) {
             target.setText(Messages.get("format.notAFolder", text));

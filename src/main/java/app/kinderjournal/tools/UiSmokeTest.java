@@ -596,6 +596,36 @@ public final class UiSmokeTest {
         } catch (java.io.IOException ex) {
             check("a temporary file could be made for the save advice check: " + ex, false);
         }
+
+        // A folder the writability estimate dislikes must still be allowed through.
+        // Files.isWritable reports false for folders the program can write to, and
+        // treating that as a veto once stopped every save on a real computer.
+        java.nio.file.Path readOnlyLooking = null;
+        for (String candidate : new String[]{
+                System.getenv("ProgramFiles"), System.getenv("SystemRoot"),
+                System.getenv("ProgramData")}) {
+            if (candidate != null && java.nio.file.Files.isDirectory(
+                    java.nio.file.Path.of(candidate))
+                    && !java.nio.file.Files.isWritable(java.nio.file.Path.of(candidate))) {
+                readOnlyLooking = java.nio.file.Path.of(candidate);
+                break;
+            }
+        }
+        if (readOnlyLooking != null) {
+            problem = app.kinderjournal.ui.SaveLocationDialog
+                    .describeFolder(readOnlyLooking.toString(), label);
+            check("a folder that merely looks read-only is a warning, not a refusal",
+                    !problem);
+            // Compared against the catalogue, not against English: the suite has
+            // switched the interface to Mongolian by this point.
+            check("and the warning comes from the may-not-write wording",
+                    label.getText().contains(readOnlyLooking.toString()));
+            check("and the warning is not the plain all-clear",
+                    !label.getText().equals(Messages.get("format.canSaveHere",
+                            readOnlyLooking.toString())));
+        } else {
+            check("a read-only-looking folder exists to test the warning", false);
+        }
     }
 
     /**
@@ -638,8 +668,40 @@ public final class UiSmokeTest {
                 body.getChildren().stream()
                         .anyMatch(node -> node instanceof javafx.scene.control.ListView<?> list
                                 && list.getItems().size() >= 3));
+
+        // The list must be tall enough to show them: a fixed 120 pixels cut it off
+        // after four entries, hiding the drives.
+        javafx.scene.control.ListView<?> placeList = findFirst(body,
+                javafx.scene.control.ListView.class);
+        if (placeList == null) {
+            check("the save dialog has a list of places", false);
+        } else {
+            double rowHeight = placeList.getFixedCellSize() > 0
+                    ? placeList.getFixedCellSize() : 24;
+            check("the places list is tall enough to show every place ("
+                            + placeList.getItems().size() + " places in "
+                            + Math.round(placeList.getHeight()) + "px)",
+                    placeList.getHeight() >= Math.min(placeList.getItems().size(), 6) * rowHeight);
+        }
+
         check("the save dialog asks for enough width to be usable",
                 body.prefWidth(-1) > 400);
+    }
+
+    /** The first node of a given type in a tree. */
+    private static <T> T findFirst(javafx.scene.Node node, Class<T> type) {
+        if (type.isInstance(node)) {
+            return type.cast(node);
+        }
+        if (node instanceof javafx.scene.Parent parent) {
+            for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) {
+                T found = findFirst(child, type);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
     }
 
     /** The text in every text field of a node tree. */

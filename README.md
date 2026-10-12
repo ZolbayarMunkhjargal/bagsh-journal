@@ -259,6 +259,15 @@ so the second report is one click.
 The plain **Browse...** button still offers the Windows chooser, for computers where
 it behaves.
 
+**The folder check is advice, not a veto.** The dialog says whether a folder can be
+written to, but a folder that merely looks unwritable is flagged as a warning and the
+save still goes ahead. That distinction matters: `Files.isWritable` is an estimate
+based on the folder's permissions, and it reports `false` for folders the program can
+write to perfectly well. Treating it as a veto once made the dialog refuse to save
+into Documents, Desktop and Downloads on a computer where writing to all three works.
+The only reliable test is to write the file, and if Windows refuses, its own reason is
+shown in full.
+
 #### Why there is no document library
 
 `.docx` and `.xlsx` are ZIP archives of XML, so the program writes them directly
