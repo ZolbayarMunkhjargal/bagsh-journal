@@ -7,7 +7,9 @@ import app.kinderjournal.model.Group;
 import app.kinderjournal.report.ReportOptions;
 import app.kinderjournal.report.ReportPreview;
 import app.kinderjournal.report.ReportRenderer;
+import app.kinderjournal.report.DocumentFormat;
 import app.kinderjournal.report.ReportType;
+import app.kinderjournal.tools.ReportExporter;
 import app.kinderjournal.ui.AppContext;
 import app.kinderjournal.ui.MainShell;
 import app.kinderjournal.ui.Refreshable;
@@ -56,6 +58,10 @@ public final class ReportsScreen implements Refreshable {
     private final ReportRenderer renderer;
 
     private ReportType type = ReportType.ATTENDANCE_DAY;
+
+    /** Built once and shown or hidden per report type, so the row does not jump. */
+    private javafx.scene.control.Button saveAsWord;
+    private javafx.scene.control.Button saveAsExcel;
     private long groupId;
     private long childId;
     private LocalDate from = LocalDate.now();
@@ -245,6 +251,7 @@ public final class ReportsScreen implements Refreshable {
             row.setOnMouseClicked(event -> {
                 type = candidate;
                 landscape = candidate.defaultLandscape();
+                applyFormatAvailability();
                 if ((candidate == ReportType.ATTENDANCE_DAY || candidate == ReportType.DAILY_PLAN)
                         && from != null) {
                     to = from;
@@ -271,7 +278,40 @@ public final class ReportsScreen implements Refreshable {
                 Ui.primaryButton(Messages.get("reports.previewAndPrint"), this::preview),
                 Ui.button(Messages.get("reports.saveWithoutPrinting"), this::saveOnly),
                 wrappedMeta(Messages.get("reports.printHint"))));
+        box.getChildren().add(buildSaveAsRow());
         return box;
+    }
+
+    /**
+     * The "save as" buttons.
+     *
+     * <p>Which of them apply depends on the report: a register is a table and
+     * belongs in a spreadsheet, while an observation report is prose and belongs in
+     * a Word document. Both buttons are built and then shown or hidden as the
+     * report changes, so the row does not jump about when the choice changes.
+     */
+    private Node buildSaveAsRow() {
+        saveAsWord = Ui.button(Messages.get("format.saveAs", DocumentFormat.WORD.label()),
+                () -> saveAs(DocumentFormat.WORD));
+        saveAsExcel = Ui.button(Messages.get("format.saveAs", DocumentFormat.EXCEL.label()),
+                () -> saveAs(DocumentFormat.EXCEL));
+        HBox row = Ui.row(saveAsWord, saveAsExcel,
+                wrappedMeta(Messages.get("format.hint")));
+        applyFormatAvailability();
+        return row;
+    }
+
+    /** Shows only the formats that suit the report currently chosen. */
+    private void applyFormatAvailability() {
+        if (saveAsWord == null || saveAsExcel == null) {
+            return;
+        }
+        boolean word = DocumentFormat.suits(type, DocumentFormat.WORD);
+        boolean excel = DocumentFormat.suits(type, DocumentFormat.EXCEL);
+        saveAsWord.setVisible(word);
+        saveAsWord.setManaged(word);
+        saveAsExcel.setVisible(excel);
+        saveAsExcel.setManaged(excel);
     }
 
     private Node buildWhoGrid() {
@@ -582,9 +622,57 @@ public final class ReportsScreen implements Refreshable {
         }
     }
 
+    /**
+     * Saves the report as a Word or Excel file.
+     *
+     * <p>The report is rendered exactly as it would be for printing, then parsed
+     * back out of that HTML, so what is saved is the same document the teacher just
+     * looked at rather than a second implementation of it.
+     */
+    private void saveAs(DocumentFormat format) {
+        ReportRenderer.Rendered rendered = generate();
+        if (rendered == null) {
+            return;
+        }
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle(Messages.get("format.saveTitle"));
+        String base = ReportRenderer.suggestedFileName(currentOptions(), type.label());
+        int dot = base.lastIndexOf('.');
+        chooser.setInitialFileName((dot > 0 ? base.substring(0, dot) : base)
+                + "." + format.extension());
+        chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter(format.filterLabel(), format.filterPattern()));
+        java.io.File chosen = chooser.showSaveDialog(shell.window());
+        if (chosen == null) {
+            return;
+        }
+        // A teacher who types a name without the extension still gets a file that
+        // Office will open, rather than one Windows cannot associate.
+        java.nio.file.Path target = chosen.toPath();
+        if (!target.getFileName().toString().toLowerCase(java.util.Locale.ROOT)
+                .endsWith("." + format.extension())) {
+            target = target.resolveSibling(
+                    target.getFileName() + "." + format.extension());
+        }
+        try {
+            ReportExporter.writeOffice(rendered.html(), format, target);
+            if (Ui.confirm(Messages.get("format.savedTitle"),
+                    Messages.get("format.saved") + "\n" + target.toAbsolutePath()
+                            + "\n\n" + Messages.get("reports.openIt"),
+                    Messages.get("reports.openItAction"))) {
+                ReportPreview.openExternally(target);
+            }
+        } catch (IllegalArgumentException ex) {
+            // The report had nothing of the kind this format needs, which is worth
+            // saying plainly rather than showing as a failure to save.
+            Ui.warn(Messages.get("format.saveTitle"), ex.getMessage());
+        } catch (IOException | RuntimeException ex) {
+            Ui.error(Messages.get("format.couldNotSave"), ex);
+        }
+    }
+
     /** Validates, generates, and reports any problem; null when it could not build. */
-    private ReportRenderer.Rendered generate() {
-        String problem = validationMessage();
+    private ReportRenderer.Rendered generate() {        String problem = validationMessage();
         if (problem != null) {
             Ui.warn(Messages.get("reports.notReady"), problem);
             return null;

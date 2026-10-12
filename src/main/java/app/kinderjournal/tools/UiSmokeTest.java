@@ -6,6 +6,7 @@ import app.kinderjournal.model.Group;
 import app.kinderjournal.model.HistoryEntry;
 import app.kinderjournal.i18n.Lang;
 import app.kinderjournal.i18n.Messages;
+import app.kinderjournal.report.DocumentFormat;
 import app.kinderjournal.report.HtmlPreview;
 import app.kinderjournal.report.ReportOptions;
 import app.kinderjournal.report.ReportRenderer;
@@ -134,9 +135,10 @@ public final class UiSmokeTest {
                 check("screen builds: " + key, buildsWithoutError(shell, key));
             }
 
+            checkSaveAsButtonsExist(scene, shell);
+
             // Builds again for every screen, to catch rebuild-only mistakes.
-            for (String key : keys) {
-                boolean ok = true;
+            for (String key : keys) {                boolean ok = true;
                 String detail = "";
                 try {
                     shell.show(key);
@@ -499,6 +501,66 @@ public final class UiSmokeTest {
             sb.append(' ').append(node.getStyleClass());
         }
         return sb.toString();
+    }
+
+    /**
+     * Checks the "save as Word" and "save as Excel" buttons are on the report
+     * screen, and that they read as the teacher's language.
+     *
+     * <p>They sit at the foot of a column that scrolls, so a mistake there is easy
+     * to miss by eye: the button would simply never appear. This looks for the
+     * labels in the built scene instead.
+     */
+    private void checkSaveAsButtonsExist(Scene scene, MainShell shell) {
+        shell.show("reports");
+        scene.getRoot().applyCss();
+        scene.getRoot().layout();
+
+        List<String> labels = new ArrayList<>();
+        collectButtonLabels(scene.getRoot(), labels);
+
+        // Compared against the catalogue rather than against English words: the
+        // suite has already switched the interface to Mongolian by this point, and
+        // "Save as Word" is "Word болгож хадгалах" there.
+        String word = Messages.get("format.saveAs", "Word");
+        String excel = Messages.get("format.saveAs", "Excel");
+        String filterWord = Messages.get("format.word.filter");
+        String filterExcel = Messages.get("format.excel.filter");
+        check("the report screen offers saving as Word", labels.contains(word));
+        check("the report screen offers saving as Excel", labels.contains(excel));
+        check("the save-as buttons are worded for the teacher, not as keys",
+                labels.stream().noneMatch(text -> text.contains("format.saveAs")));
+
+        // Each format must be spelled out, and the file chooser it opens must use
+        // the extension that goes with it: a Word button saving .xlsx would be a
+        // silent disaster.
+        check("the Word button names the format",
+                !DocumentFormat.WORD.label().isBlank() && word.contains(DocumentFormat.WORD.label()));
+        check("the Excel button names the format",
+                !DocumentFormat.EXCEL.label().isBlank() && excel.contains(DocumentFormat.EXCEL.label()));
+        check("the Word file chooser filters for .docx",
+                DocumentFormat.WORD.filterPattern().equals("*.docx")
+                        && DocumentFormat.WORD.extension().equals("docx")
+                        && DocumentFormat.WORD.filterLabel().contains("docx"));
+        check("the Excel file chooser filters for .xlsx",
+                DocumentFormat.EXCEL.filterPattern().equals("*.xlsx")
+                        && DocumentFormat.EXCEL.extension().equals("xlsx")
+                        && DocumentFormat.EXCEL.filterLabel().contains("xlsx"));
+        check("the two formats are told apart by their extensions",
+                !DocumentFormat.WORD.extension().equals(DocumentFormat.EXCEL.extension()));
+    }
+
+    /** Every button caption in a node tree. */
+    private static void collectButtonLabels(javafx.scene.Node node, List<String> sink) {
+        if (node instanceof javafx.scene.control.ButtonBase button
+                && button.getText() != null && !button.getText().isBlank()) {
+            sink.add(button.getText());
+        }
+        if (node instanceof javafx.scene.Parent parent) {
+            for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) {
+                collectButtonLabels(child, sink);
+            }
+        }
     }
 
     /**

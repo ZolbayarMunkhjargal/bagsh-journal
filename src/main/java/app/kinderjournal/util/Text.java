@@ -125,6 +125,28 @@ public final class Text {
         return sb.toString();
     }
 
+    /**
+     * The inverse of {@link #escapeHtml}, for reading a generated report back.
+     *
+     * <p>Used when a printed report is turned into a Word or Excel file: the
+     * renderer's HTML is parsed back into text, and the entities it wrote have to
+     * become characters again or the teacher sees "&amp;amp;" in the document.
+     */
+    public static String unescapeHtml(String value) {
+        if (value == null || value.isEmpty()) {
+            return "";
+        }
+        return value
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&#39;", "'")
+                .replace("&apos;", "'")
+                .replace("&nbsp;", "\u00a0")
+                // Ampersand last, so an escaped entity is not decoded twice.
+                .replace("&amp;", "&");
+    }
+
     /** Escapes text and converts blank lines into paragraph breaks. */
     public static String escapeHtmlParagraphs(String value) {
         if (isBlank(value)) {

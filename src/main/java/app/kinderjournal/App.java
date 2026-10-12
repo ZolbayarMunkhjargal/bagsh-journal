@@ -213,6 +213,20 @@ public class App extends Application {
             launch(app.kinderjournal.tools.DemoWindow.class, new String[0]);
             return;
         }
+        if (hasFlag(args, "--export-office")) {
+            String value = valueOf(args, "--export-office");
+            Path target = value == null ? AppPaths.dataDir().resolve("reports") : Path.of(value);
+            try {
+                int written = app.kinderjournal.tools.ReportExporter.export(target,
+                        app.kinderjournal.report.DocumentFormat.WORD);
+                written += app.kinderjournal.tools.ReportExporter.export(target,
+                        app.kinderjournal.report.DocumentFormat.EXCEL);
+                System.out.println("Wrote " + written + " file(s) to " + target.toAbsolutePath());
+            } catch (Exception ex) {
+                System.out.println("Could not write the reports: " + ex);
+            }
+            return;
+        }
         if (hasFlag(args, "--export-reports")) {
             String value = valueOf(args, "--export-reports");
             Path target = value == null ? AppPaths.dataDir().resolve("reports") : Path.of(value);

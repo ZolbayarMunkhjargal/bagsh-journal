@@ -3,9 +3,14 @@ package app.kinderjournal.tools;
 import app.kinderjournal.db.Repository;
 import app.kinderjournal.model.Child;
 import app.kinderjournal.model.Group;
+import app.kinderjournal.report.DocumentFormat;
+import app.kinderjournal.report.ExcelWorkbook;
+import app.kinderjournal.report.ReportDocument;
+import app.kinderjournal.report.ReportDocumentParser;
 import app.kinderjournal.report.ReportOptions;
 import app.kinderjournal.report.ReportRenderer;
 import app.kinderjournal.report.ReportType;
+import app.kinderjournal.report.WordDocument;
 import app.kinderjournal.util.Dates;
 import app.kinderjournal.util.Text;
 
@@ -32,9 +37,24 @@ public final class ReportExporter {
      * @return the number of files written
      */
     public static int exportAll(Path targetDir) throws IOException {
+        return export(targetDir, null);
+    }
+
+    /**
+     * Generates the reports, as HTML and optionally as Word and Excel files.
+     *
+     * @param only the single format to write besides HTML, or null for HTML only
+     * @return the number of files written
+     */
+    public static int export(Path targetDir, DocumentFormat only) throws IOException {
         Files.createDirectories(targetDir);
         int written = 0;
         try (Repository repo = Repository.open()) {
+            // The stored language has to be applied before anything is rendered. It
+            // is normally applied when the window opens, and there is no window here,
+            // so without this a folder set to Mongolian would export English papers.
+            app.kinderjournal.i18n.Messages.setCurrent(app.kinderjournal.i18n.Lang.fromCode(
+                    repo.db().setting("language", app.kinderjournal.i18n.Lang.ENGLISH.code())));
             ReportRenderer renderer = new ReportRenderer(repo);
             List<Group> groups = repo.groups().listActive();
             if (groups.isEmpty()) {
@@ -96,9 +116,37 @@ public final class ReportExporter {
                 System.out.printf("  %-26s %6d bytes  %s  [%s]%n", type.label(),
                         Files.size(file), file.getFileName(),
                         Text.summarise(subject(options, group, child), 44));
+
+                // The same report again as a Word or Excel file, when asked for. The
+                // document is parsed back out of the HTML that was just written, which
+                // is exactly what the "save as" buttons do.
+                if (only == null || !DocumentFormat.suits(type, only)) {
+                    continue;
+                }
+                Path office = targetDir.resolve(
+                        type.name().toLowerCase().replace('_', '-') + "." + only.extension());
+                try {
+                    writeOffice(rendered.html(), only, office);
+                    written++;
+                    System.out.printf("  %-26s %6d bytes  %s%n", "", Files.size(office),
+                            office.getFileName());
+                } catch (RuntimeException ex) {
+                    System.out.println("  FAILED " + type.label() + " as " + only.label()
+                            + ": " + ex.getMessage());
+                }
             }
         }
         return written;
+    }
+
+    /** Saves one rendered report in the given Office format. */
+    public static void writeOffice(String html, DocumentFormat format, Path file) throws IOException {
+        ReportDocument document = ReportDocumentParser.parse(html);
+        if (format == DocumentFormat.WORD) {
+            WordDocument.write(document, file);
+        } else {
+            ExcelWorkbook.write(document, file);
+        }
     }
 
     /** What each document is about, printed alongside it for a quick sanity check. */

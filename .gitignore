@@ -16,3 +16,7 @@ desktop.ini
 
 # A throwaway data folder built by tools/make_tryout_data.py - sample records, not source.
 tryout-data/
+
+# Python bytecode from the checking scripts.
+__pycache__/
+*.pyc

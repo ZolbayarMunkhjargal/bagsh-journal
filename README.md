@@ -40,7 +40,7 @@ point. Photographs are copied into the program's own folder on the same disk.
 | **Lesson & activity plans** | Day, week and month views. Objectives, materials, the planned sequence, notes for the day, a status, and a reflection written afterwards. Any plan can be saved as a template or copied to another date. |
 | **Child history** | Everything recorded about one child merged into a single timeline, newest first, with filters for period and record type. |
 | **Advanced search** | One search across observations, interview notes, activity descriptions and child profiles, with combined filters for class, child, date range, category and record type. |
-| **Print & reports** | Eleven document types, previewed in the program and printed through the Windows print dialog, which also saves to PDF. |
+| **Print & reports** | Eleven document types, previewed in the program and printed through the Windows print dialog, which also saves to PDF. Any report can also be saved as an editable Word or Excel file. |
 | **English and Mongolian** | The whole interface and every printed report can be switched between English and Mongolian with one button, and the choice is remembered. |
 | **Data & backup** | One-file backups of the database and every photo, restore with a safety copy taken first, a health check, and a list of any photos whose file has gone missing. |
 
@@ -210,7 +210,64 @@ category, interview type and plan status. Results show the date, the type, the
 child and a snippet with the match highlighted.
 
 **Print & reports** - choose a document, who it covers, the period and what to
-include, see how many records it will contain, then preview and print.
+include, see how many records it will contain, then preview and print. Reports
+can also be saved as Word or Excel files; see below.
+
+### Saving a report as a Word or Excel file
+
+Besides printing, a report can be saved as an editable file:
+
+| Button | What you get |
+| --- | --- |
+| **Save as Word** | A `.docx` with real Word headings and tables, so it can be edited, signed off, or put in a child's folder. |
+| **Save as Excel** | A `.xlsx` with each table on its own sheet, numbers stored as numbers, so columns can be sorted and totalled. |
+
+Which buttons appear depends on the report, because a register and an observation
+report are different kinds of document:
+
+| Report | Word | Excel |
+| --- | :---: | :---: |
+| Daily attendance sheet, Attendance summary, Monthly attendance grid | yes | yes |
+| Class report for a period, Search results | yes | yes |
+| Child profile sheet | yes | no |
+| Observation report, Interview summary | yes | no |
+| Child history report, Daily plan, Weekly plan | yes | no |
+
+Excel is offered where the report is a table of one row per child; a spreadsheet
+of prose is no use to anyone, and the child history is a dated list of entries
+rather than a table. If a report has no table at all, the Excel button is not
+shown rather than producing an empty file.
+
+#### Why there is no document library
+
+`.docx` and `.xlsx` are ZIP archives of XML, so the program writes them directly
+and carries no third-party document library. Apache POI would add roughly 17MB to
+the download - most of it for a feature used only when a report is handed to
+somebody else.
+
+The trade-off is that this is code we maintain rather than a library everyone
+trusts, so it is checked two ways: `tools\test.ps1` writes files and reads the
+package back, checking every required part is present and that the XML parses, and
+
+```bat
+python tools\check_office_files.py <folder>
+```
+
+opens the written files with `python-docx` and `openpyxl` - independent
+implementations of the same formats - and confirms the text, headings and numbers
+come back out. That is the check that would catch a file Word would refuse.
+
+The report is rendered to HTML for the preview pane, then parsed back out of that
+HTML to fill the Word or Excel file, so a saved report is the same document that
+was on screen. Every report type gained both formats from that one change, and a
+layout change shows up in all three outputs at once.
+
+To write a whole set of files without opening the window:
+
+```bat
+run.bat --export-office build\reports
+run.bat --export-reports build\reports
+```
 
 **Data & backup** - where the data is, how big it is, backup and restore, a
 health check, and the teacher's name for report headings. It also holds a
