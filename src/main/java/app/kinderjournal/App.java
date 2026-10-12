@@ -11,7 +11,9 @@ import app.kinderjournal.util.AppPaths;
 
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
+import javafx.stage.Screen;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.TextArea;
@@ -48,14 +50,28 @@ public class App extends Application {
         AppContext context = new AppContext(repository);
         MainShell shell = new MainShell(context, stage);
 
-        Scene scene = new Scene((javafx.scene.Parent) shell.root(), 1180, 760);
+        // The window must fit the screen it opens on. A laptop running Windows at
+        // 200% scaling reports only about 1440x810 logical pixels on a 2880x1620
+        // panel, and a window wider than that has its right-hand side pushed off
+        // the display - which is where form labels and checkbox captions live, so
+        // they silently disappear rather than looking merely cramped.
+        Rectangle2D visible = Screen.getPrimary().getVisualBounds();
+        double width = Math.min(1_180, Math.max(880, visible.getWidth() - 120));
+        double height = Math.min(840, Math.max(600, visible.getHeight() - 100));
+
+        Scene scene = new Scene((javafx.scene.Parent) shell.root(), width, height);
         scene.getStylesheets().addAll(Styles.stylesheet());
         scene.setOnKeyPressed(shell::handleShortcut);
 
         stage.setScene(scene);
         stage.setTitle(Messages.get("app.windowTitle"));
-        stage.setMinWidth(960);
-        stage.setMinHeight(640);
+        // The content needs a floor, but never more than the screen can show.
+        stage.setMinWidth(Math.min(960, width));
+        stage.setMinHeight(Math.min(640, height));
+        // Centre it, so a window that is smaller than the screen is not left
+        // hanging off an edge.
+        stage.setX(visible.getMinX() + Math.max(0, (visible.getWidth() - width) / 2));
+        stage.setY(visible.getMinY() + Math.max(0, (visible.getHeight() - height) / 2));
         stage.setOnCloseRequest(event -> closeQuietly());
         stage.show();
 
@@ -169,6 +185,10 @@ public class App extends Application {
             System.exit(0);
             return;
         }
+        if (hasFlag(args, "--css-probe")) {
+            launch(app.kinderjournal.tools.CssProbe.class, new String[0]);
+            return;
+        }
         if (hasFlag(args, "--ui-test")) {
             new app.kinderjournal.tools.UiSmokeTest().run();
             return;
@@ -181,6 +201,14 @@ public class App extends Application {
             String folder = valueOf(args, "--data-dir");
             if (folder != null) {
                 System.setProperty(app.kinderjournal.tools.DemoWindow.PROPERTY_FOLDER, folder);
+            }
+            String screenName = valueOf(args, "--screen");
+            if (screenName != null) {
+                System.setProperty(app.kinderjournal.tools.DemoWindow.PROPERTY_SCREEN, screenName);
+            }
+            String shot = valueOf(args, "--snapshot");
+            if (shot != null) {
+                System.setProperty(app.kinderjournal.tools.DemoWindow.PROPERTY_SNAPSHOT, shot);
             }
             launch(app.kinderjournal.tools.DemoWindow.class, new String[0]);
             return;

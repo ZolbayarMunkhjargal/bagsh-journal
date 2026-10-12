@@ -534,7 +534,11 @@ public final class Ui {
     public static javafx.scene.control.ScrollPane scroll(Node content) {
         javafx.scene.control.ScrollPane pane = new javafx.scene.control.ScrollPane(content);
         pane.setFitToWidth(true);
-        pane.setHbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.NEVER);
+        // A screen whose content has a minimum width - the report builder's two
+        // columns, for instance - would otherwise be squeezed until its right-hand
+        // labels fell outside the window. Allowing the bar to appear means narrow
+        // windows can still reach everything.
+        pane.setHbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.AS_NEEDED);
         pane.getStyleClass().add("screen-scroll");
         return pane;
     }

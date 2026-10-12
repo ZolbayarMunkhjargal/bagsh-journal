@@ -42,7 +42,6 @@ public final class UiSmokeTest {
     private static int failed;
     private static final List<String> failures = new ArrayList<>();
 
-    /** Runs every check, prints a summary, and terminates the JVM. */
     public void run() {
         CountDownLatch done = new CountDownLatch(1);
         try {
@@ -111,10 +110,16 @@ public final class UiSmokeTest {
             AppContext context = new AppContext(repo);
             MainShell shell = new MainShell(context, stage);
 
-            Scene scene = new Scene((javafx.scene.Parent) shell.root(), 1280, 800);
+            // 1170x800 rather than something comfortable: a laptop at 200% Windows
+            // scaling reports only about 1440x810 logical pixels, so this is the
+            // size screens must survive.
+            Scene scene = new Scene((javafx.scene.Parent) shell.root(), 1170, 800);
             scene.getStylesheets().addAll(Styles.stylesheet());
             scene.setOnKeyPressed(shell::handleShortcut);
             stage.setScene(scene);
+            // Give the stage a real size so the fit checks measure against it.
+            stage.setWidth(1170);
+            stage.setHeight(800);
 
             check("shell built", shell.root() != null);
             check("stylesheet found on the classpath", Styles.url() != null);
@@ -198,6 +203,8 @@ public final class UiSmokeTest {
             // An empty database must not break any screen either.
             check("screens survive an empty class", emptyClassIsSafe(repo, shell, context));
 
+            checkNothingIsWiderThanTheWindow(scene, shell, keys);
+
             checkEveryReportType(repo);
         } catch (Throwable ex) {
             fail("smoke test aborted: " + ex);
@@ -205,7 +212,6 @@ public final class UiSmokeTest {
         }
     }
 
-    /** All label text in a node tree, for checking that a language took effect. */
     private static String textOf(javafx.scene.Node node) {
         StringBuilder sb = new StringBuilder();
         collectText(node, sb);
@@ -345,6 +351,173 @@ public final class UiSmokeTest {
         String noMatch = renderer.render(ReportOptions.builder(ReportType.SEARCH_RESULTS)
                 .keyword("zzzznotfound").range(from, to).build()).html();
         check("empty search report still renders", noMatch.contains("</html>"));
+    }
+
+    /**
+     * Checks that no screen demands more width than the window offers.
+     *
+     * <p>This is the bug that prompted the check: a screen whose content needs
+     * more room than the window is wide has its right-hand side cut off, and
+     * because form captions and checkbox labels live on the right, they look as
+     * though they were never drawn. Nothing throws, so only a measurement finds
+     * it - and a 1440x810 logical screen, which is what a laptop at 200% scaling
+     * reports, is narrow enough to trigger it.
+     */
+    private void checkNothingIsWiderThanTheWindow(Scene scene, MainShell shell, String[] keys) {
+        double available = scene.getWindow() != null && scene.getWindow().getWidth() > 0
+                ? scene.getWindow().getWidth()
+                : scene.getWidth();
+        for (String key : keys) {
+            if (!buildsWithoutError(shell, key)) {
+                continue;
+            }
+            scene.getRoot().applyCss();
+            scene.getRoot().layout();
+            double needed = scene.getRoot().minWidth(-1);
+            // The root's own minimum covers padding and the sidebar; a screen that
+            // needs more than this cannot be shown without losing its right edge.
+            String detail = " (needs " + Math.round(needed) + "px, window is "
+                    + Math.round(available) + "px)";
+            check("screen fits the window width: " + key + detail, needed <= available + 1);
+
+            // A ScrollPane reports a small minimum of its own however wide its
+            // content is, so the root measurement above cannot see inside it. What
+            // can be checked is that the content does not ask for far more width
+            // than the window offers: past that point the scroll pane produces a
+            // horizontal bar and the right-hand side of the screen is off-view.
+            for (javafx.scene.control.ScrollPane pane : scrollPanesIn(scene.getRoot())) {
+                javafx.scene.Node content = pane.getContent();
+                if (content == null || pane.getViewportBounds() == null) {
+                    continue;
+                }
+                double viewport = pane.getViewportBounds().getWidth();
+                if (viewport <= 0) {
+                    continue;
+                }
+                double needs = content.minWidth(-1);
+                // 80px of slack: a Label reports the width of its text on one line
+                // even when it wraps, so a small excess is not a visible overflow.
+                if (needs > viewport + 80) {
+                    check("screen content is not far wider than the window: " + key
+                            + " (needs " + Math.round(needs) + "px, viewport is "
+                            + Math.round(viewport) + "px)", false);
+                    explainWidth(content, "  ");
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    /**
+    private static void findOffscreen(javafx.scene.Node node, double limit,
+                                      List<String> sink, boolean leavesOnly) {
+        if (!node.isVisible() || node.getScene() == null) {
+            return;
+        }
+        javafx.geometry.Bounds inScene = node.localToScene(node.getBoundsInLocal());
+        boolean tooFarRight = inScene.getMaxX() > limit
+                && node.getBoundsInLocal().getWidth() > 0;
+        boolean isParent = node instanceof javafx.scene.Parent;
+        if (tooFarRight && !(leavesOnly && isParent)) {
+            sink.add(Math.round(inScene.getMaxX()) + "px right edge: " + describe(node));
+        }
+        if (isParent) {
+            javafx.scene.Parent parent = (javafx.scene.Parent) node;
+            for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) {
+                findOffscreen(child, limit, sink, leavesOnly);
+            }
+        }
+    }
+
+    /**
+    private static void reportWidest(javafx.scene.Node node, double total) {
+        List<WidthEntry> entries = new ArrayList<>();
+        collectWidths(node, entries);
+        entries.sort((a, b) -> Double.compare(b.width(), a.width()));
+        System.out.println("        content needs " + Math.round(total)
+                + "px; widest children:");
+        for (int i = 0; i < Math.min(6, entries.size()); i++) {
+            WidthEntry entry = entries.get(i);
+            if (entry.width() <= 0) {
+                continue;
+            }
+            System.out.println("          " + Math.round(entry.width()) + "px  " + entry.what());
+        }
+    }
+
+    private static void collectWidths(javafx.scene.Node node, List<WidthEntry> sink) {
+        double width = node.minWidth(-1);
+        if (width > 0) {
+            sink.add(new WidthEntry(describe(node), width));
+        }
+        if (node instanceof javafx.scene.Parent parent) {
+            for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) {
+                collectWidths(child, sink);
+            }
+        }
+    }
+
+    /** A node's minimum width, with a description that identifies it. */
+    private record WidthEntry(String what, double width) {
+    }
+
+    private static String describe(javafx.scene.Node node) {
+        StringBuilder sb = new StringBuilder(node.getClass().getSimpleName());
+        if (node instanceof javafx.scene.control.Labeled labelled
+                && labelled.getText() != null && !labelled.getText().isBlank()) {
+            String text = labelled.getText().replace('\n', ' ');
+            sb.append(" \"").append(text, 0, Math.min(38, text.length())).append('"');
+        }
+        if (!node.getStyleClass().isEmpty()) {
+            sb.append(' ').append(node.getStyleClass());
+        }
+        return sb.toString();
+    }
+
+    /** Every ScrollPane in a node tree. */
+    private static List<javafx.scene.control.ScrollPane> scrollPanesIn(javafx.scene.Node node) {
+        List<javafx.scene.control.ScrollPane> found = new ArrayList<>();
+        if (node instanceof javafx.scene.control.ScrollPane pane) {
+            found.add(pane);
+        }
+        if (node instanceof javafx.scene.Parent parent) {
+            for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) {
+                found.addAll(scrollPanesIn(child));
+            }
+        }
+        return found;
+    }
+
+    /**
+     * Walks the layout tree and names the children that demand the most width.
+     *
+     * <p>Used when a screen reports itself wider than its viewport: the answer is
+     * always a handful of leaf controls whose text does not wrap, and naming them
+     * is far quicker than reasoning about which label it might be.
+     */
+    private static void explainWidth(javafx.scene.Node node, String indent) {
+        List<String> lines = new ArrayList<>();
+        collectDemanding(node, indent, lines);
+        for (int i = 0; i < Math.min(12, lines.size()); i++) {
+            System.out.println(lines.get(i));
+        }
+    }
+
+    private static void collectDemanding(javafx.scene.Node node, String indent, List<String> sink) {
+        if (node instanceof javafx.scene.Parent parent) {
+            for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) {
+                double width = child.minWidth(-1);
+                if (width > 250) {
+                    sink.add(indent + Math.round(width) + "px  " + describe(child));
+                    if (child instanceof javafx.scene.Parent) {
+                        collectDemanding(child, indent + "  ", sink);
+                    }
+                } else {
+                    collectDemanding(child, indent, sink);
+                }
+            }
+        }
     }
 
     // ------------------------------------------------------------------ helpers

@@ -4,6 +4,12 @@
    and to print sensibly if the teacher ever screenshots a view.
    ========================================================================== */
 
+/* Text colour is stated explicitly for every control rather than inherited from
+   the theme. JavaFX fills some controls - check boxes, radio buttons and table
+   cells in particular - from -fx-text-background-color, a value the theme derives
+   from the background. Because this application sets its own surface colours, the
+   derived value was landing within a shade or two of the background, so checkbox
+   captions were drawn but effectively invisible. */
 .root {
     -fx-font-family: "Segoe UI", "Inter", sans-serif;
     -fx-font-size: 13px;
@@ -18,6 +24,36 @@
     kj-header: #10393b;
 
     -fx-background-color: kj-bg;
+    -fx-text-fill: kj-text;
+}
+
+.label {
+    -fx-text-fill: kj-text;
+}
+
+.check-box {
+    -fx-font-size: 12.5px;
+    -fx-text-fill: kj-text;
+}
+
+.check-box .text,
+.radio-button .text {
+    -fx-fill: kj-text;
+}
+
+.check-box:disabled,
+.radio-button:disabled {
+    -fx-text-fill: #94a3b8;
+}
+
+.check-box:disabled .text,
+.radio-button:disabled .text {
+    -fx-fill: #94a3b8;
+}
+
+.radio-button {
+    -fx-font-size: 12.5px;
+    -fx-text-fill: kj-text;
 }
 
 /* ------------------------------------------------------------------ shell */
@@ -29,8 +65,10 @@
 .sidebar {
     -fx-background-color: kj-header;
     -fx-padding: 18 0 14 0;
-    -fx-min-width: 232;
-    -fx-pref-width: 232;
+    /* Kept as narrow as the longest menu caption allows: on a small laptop every
+       pixel taken here is one the form on the right cannot use. */
+    -fx-min-width: 208;
+    -fx-pref-width: 208;
 }
 
 .sidebar-brand {
@@ -503,13 +541,6 @@
     -fx-background-color: #ffffff;
 }
 
-.check-box {
-    -fx-font-size: 12.5px;
-}
-
-.radio-button {
-    -fx-font-size: 12.5px;
-}
 
 .form-error {
     -fx-text-fill: #b3261e;

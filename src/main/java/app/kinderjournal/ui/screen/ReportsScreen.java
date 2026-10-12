@@ -198,17 +198,25 @@ public final class ReportsScreen implements Refreshable {
         header.setAlignment(Pos.CENTER_LEFT);
         header.getChildren().addAll(
                 Ui.screenTitle(Messages.get("reports.build")),
-                Ui.meta(Messages.get("reports.onlyTeacherNotes")),
+                wrappedMeta(Messages.get("reports.onlyTeacherNotes")),
                 Ui.spacer(),
                 Ui.primaryButton(Messages.get("reports.preview"), this::preview));
         page.getChildren().add(header);
 
         HBox columns = new HBox(16);
         VBox left = buildTypeList();
-        left.setPrefWidth(340);
-        left.setMinWidth(300);
+        left.setPrefWidth(320);
+        left.setMinWidth(268);
         VBox right = buildOptions();
-        HBox.setHgrow(right, Priority.ALWAYS);
+        // The include-checkboxes and their captions are the point of this screen.
+        // The column is pinned to a fixed width rather than left to grow: a form
+        // decides its own width from its widest row, and a long checkbox caption
+        // would otherwise make the column wider than the window and push it off
+        // the right-hand edge, where the captions simply vanish from view.
+        right.setMinWidth(650);
+        right.setPrefWidth(650);
+        right.setMaxWidth(650);
+        VBox.setVgrow(right, Priority.NEVER);
         columns.getChildren().addAll(left, right);
         page.getChildren().add(columns);
 
@@ -230,6 +238,9 @@ public final class ReportsScreen implements Refreshable {
             Label detail = new Label(candidate.description());
             detail.getStyleClass().add("row-subtitle");
             detail.setWrapText(true);
+            // Without this a wrapped label still reports its single-line width as a
+            // minimum, which would widen the whole screen past the window.
+            detail.setMinWidth(0);
             row.getChildren().addAll(title, detail);
             row.setOnMouseClicked(event -> {
                 type = candidate;
@@ -259,7 +270,7 @@ public final class ReportsScreen implements Refreshable {
         box.getChildren().add(Ui.row(
                 Ui.primaryButton(Messages.get("reports.previewAndPrint"), this::preview),
                 Ui.button(Messages.get("reports.saveWithoutPrinting"), this::saveOnly),
-                Ui.meta(Messages.get("reports.printHint"))));
+                wrappedMeta(Messages.get("reports.printHint"))));
         return box;
     }
 
@@ -330,7 +341,11 @@ public final class ReportsScreen implements Refreshable {
         who.add(Ui.field(Messages.get("common.from"), fromPicker), 0, 1);
         who.add(Ui.field(Messages.get("common.to"), toPicker), 1, 1);
 
-        HBox quick = new HBox(8,
+        // A FlowPane rather than an HBox: five buttons on one line are wider than
+        // the form column, and an HBox reports that width as its minimum, which
+        // pushed the whole page wider than the window. Wrapping keeps the row
+        // inside the column.
+        javafx.scene.layout.FlowPane quick = new javafx.scene.layout.FlowPane(8, 6,
                 Ui.button(Messages.get("common.today"), () -> setRange(LocalDate.now(), LocalDate.now())),
                 Ui.button(Messages.get("common.thisWeek"), () -> {
                     LocalDate start = Dates.startOfWeek(LocalDate.now());
@@ -347,7 +362,8 @@ public final class ReportsScreen implements Refreshable {
                     int startYear = today.getMonthValue() >= 8 ? today.getYear() : today.getYear() - 1;
                     setRange(LocalDate.of(startYear, 8, 1), today);
                 }));
-        who.add(Ui.row(Ui.fieldLabel(Messages.get("reports.quickRanges")), quick), 0, 2, 2, 1);
+        who.add(Ui.fieldLabel(Messages.get("reports.quickRanges")), 0, 2, 2, 1);
+        who.add(quick, 0, 3, 2, 1);
         return who;
     }
 
@@ -426,6 +442,13 @@ public final class ReportsScreen implements Refreshable {
                                   java.util.function.Consumer<Boolean> setter) {
         CheckBox box = new CheckBox(label);
         box.setSelected(value);
+        // Captions are allowed to wrap. A CheckBox measures itself from the full
+        // width of its text, so a long caption would otherwise demand more width
+        // than the window has and push the whole column off the right-hand edge -
+        // which makes the labels look as though they were never drawn.
+        box.setWrapText(true);
+        box.setMinWidth(0);
+        box.setMaxWidth(Double.MAX_VALUE);
         box.selectedProperty().addListener((observable, previous, next) -> setter.accept(next));
         return box;
     }
@@ -438,7 +461,7 @@ public final class ReportsScreen implements Refreshable {
                 list.getChildren().add(Ui.keyValue(entry.getKey(), String.valueOf(entry.getValue())));
             }
         } catch (RuntimeException ex) {
-            list.getChildren().add(Ui.meta(Messages.get("reports.summaryNeedsSelection")));
+            list.getChildren().add(wrappedMeta(Messages.get("reports.summaryNeedsSelection")));
         }
         String warning = validationMessage();
         if (warning != null) {
@@ -455,10 +478,27 @@ public final class ReportsScreen implements Refreshable {
 
     private Node buildFootnote() {
         VBox box = new VBox(6);
-        box.getChildren().add(Ui.meta(Messages.get("reports.footnote")));
-        box.getChildren().add(Ui.meta(Messages.get("status.dataFolder",
-                AppPaths.dataDir().toAbsolutePath())));
+        box.getChildren().add(wrappedMeta(Messages.get("reports.footnote")));
+        box.getChildren().add(wrappedMeta(
+                Messages.get("status.dataFolder", AppPaths.dataDir().toAbsolutePath())));
         return box;
+    }
+
+    /**
+     * A caption that wraps instead of dictating the width of the whole screen.
+     *
+     * <p>A Label measures its minimum width from its text on a single line even
+     * when wrapping is enabled. A long sentence in a footnote therefore made this
+     * screen demand more width than the window had, and the extra width pushed the
+     * right-hand column - the include-checkboxes and their captions - off the
+     * visible area, where they looked as though they had never been drawn.
+     */
+    private static Label wrappedMeta(String text) {
+        Label label = Ui.meta(text);
+        label.setWrapText(true);
+        label.setMinWidth(0);
+        label.setMaxWidth(560);
+        return label;
     }
 
     // ------------------------------------------------------------------ options

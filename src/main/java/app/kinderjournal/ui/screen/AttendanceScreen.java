@@ -278,7 +278,11 @@ public final class AttendanceScreen implements Refreshable {
     private void applyColumnConstraints(GridPane grid) {
         grid.setHgap(10);
         grid.setVgap(6);
-        double[] widths = {4, 24, 30, 28, 14};
+        // Percentage columns are measured against the grid's width, and the gaps
+        // are taken out of the same space, so these must add up to well under 100:
+        // five 10px gaps plus the card's own padding have to fit too. At 100 the
+        // last column was pushed past the right-hand edge of the window.
+        double[] widths = {4, 22, 28, 26, 12};
         for (double width : widths) {
             ColumnConstraints column = new ColumnConstraints();
             column.setPercentWidth(width);
@@ -302,8 +306,11 @@ public final class AttendanceScreen implements Refreshable {
         int total = register.size();
         int rate = total == 0 ? -1 : (int) Math.round((present + late) * 100.0 / total);
 
-        HBox tiles = new HBox(10);
-        tiles.getChildren().addAll(
+        // A FlowPane, not an HBox: six tiles at 112px plus five gaps come to 722px,
+        // and an HBox insists on that width, which made the whole register wider
+        // than the window and pushed its right-hand column out of view. Wrapping
+        // the tiles keeps the row inside whatever space the card has.
+        javafx.scene.layout.FlowPane tiles = new javafx.scene.layout.FlowPane(10, 10,
                 summaryChip(String.valueOf(present), Messages.get("attendance.present"), "#1b5e20"),
                 summaryChip(String.valueOf(absent), Messages.get("attendance.absent"), "#b71c1c"),
                 summaryChip(String.valueOf(late), Messages.get("attendance.late"), "#e65100"),
@@ -318,8 +325,9 @@ public final class AttendanceScreen implements Refreshable {
     private Node summaryChip(String value, String label, String colour) {
         VBox box = new VBox(1);
         box.getStyleClass().add("stat-tile");
-        box.setPrefWidth(134);
-        box.setMinWidth(112);
+        box.setPrefWidth(128);
+        box.setMinWidth(104);
+        box.setMaxWidth(128);
         Label valueLabel = new Label(value);
         valueLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: "
                 + Ui.shade(colour, 0.1) + ";");
@@ -578,7 +586,9 @@ public final class AttendanceScreen implements Refreshable {
                 Messages.get("attendance.excused"),
                 Messages.get("attendance.column.recorded"),
                 Messages.get("attendance.column.rate")};
-        double[] widths = {34, 11, 11, 11, 11, 11, 11};
+        // 10% is left over for the six gaps between the columns: the columns plus
+        // the gaps must not exceed the width the scroll pane can give them.
+        double[] widths = {24, 12, 12, 12, 12, 12, 12};
         for (int i = 0; i < titles.length; i++) {
             ColumnConstraints column = new ColumnConstraints();
             column.setPercentWidth(widths[i]);
