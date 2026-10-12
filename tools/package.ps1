@@ -8,6 +8,7 @@
 #   tools\package.ps1 -NoInstaller         app folder only
 #   tools\package.ps1 -Zip                 also write a .zip of the app folder
 #   tools\package.ps1 -DataDir D           make the shortcut keep its records in D
+#   tools\package.ps1 -OutDir D            write the app and installer to D instead of release\
 
 [CmdletBinding()]
 param(
@@ -16,7 +17,8 @@ param(
     [switch]$Zip,
     [string]$AppName = 'KinderJournal',
     [string]$Version = '1.0.0',
-    [string]$DataDir
+    [string]$DataDir,
+    [string]$OutDir
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,7 +38,11 @@ function Fail($msg) {
 if ($LASTEXITCODE -ne 0) { Fail 'The build did not succeed.' }
 
 $classesDir = Join-Path $root 'build\classes'
-$releaseDir = Join-Path $root 'release'
+# -OutDir writes the finished app and installer somewhere else. Worth using when
+# the project folder carries a restrictive ACL - a folder used for sandboxed work
+# has a low integrity label that is inherited by anything built inside it, and a
+# file carrying that label cannot be written to by the person who installed it.
+$releaseDir = if ($OutDir) { [System.IO.Path]::GetFullPath($OutDir) } else { Join-Path $root 'release' }
 $inputDir   = Join-Path $root 'build\package-input'
 $appOut     = Join-Path $releaseDir "$AppName-$Version-windows"
 
