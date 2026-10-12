@@ -628,39 +628,36 @@ public final class ReportsScreen implements Refreshable {
      * <p>The report is rendered exactly as it would be for printing, then parsed
      * back out of that HTML, so what is saved is the same document the teacher just
      * looked at rather than a second implementation of it.
+     *
+     * <p>The destination is chosen with KinderJournal's own dialog rather than the
+     * Windows one. The Windows dialog refuses to save for some computers, reporting
+     * a permission problem for every folder even when the program can write to them
+     * perfectly well; using our own avoids that entirely.
      */
     private void saveAs(DocumentFormat format) {
         ReportRenderer.Rendered rendered = generate();
         if (rendered == null) {
             return;
         }
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle(Messages.get("format.saveTitle"));
         String base = ReportRenderer.suggestedFileName(currentOptions(), type.label());
         int dot = base.lastIndexOf('.');
-        chooser.setInitialFileName((dot > 0 ? base.substring(0, dot) : base)
-                + "." + format.extension());
-        chooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter(format.filterLabel(), format.filterPattern()));
-        java.io.File chosen = chooser.showSaveDialog(shell.window());
-        if (chosen == null) {
+        String suggested = (dot > 0 ? base.substring(0, dot) : base) + "." + format.extension();
+
+        java.nio.file.Path target =
+                app.kinderjournal.ui.SaveLocationDialog.choose(shell.window(), format,
+                        suggested, context);
+        if (target == null) {
             return;
-        }
-        // A teacher who types a name without the extension still gets a file that
-        // Office will open, rather than one Windows cannot associate.
-        java.nio.file.Path target = chosen.toPath();
-        if (!target.getFileName().toString().toLowerCase(java.util.Locale.ROOT)
-                .endsWith("." + format.extension())) {
-            target = target.resolveSibling(
-                    target.getFileName() + "." + format.extension());
         }
         try {
             ReportExporter.writeOffice(rendered.html(), format, target);
+            long size = java.nio.file.Files.size(target);
             if (Ui.confirm(Messages.get("format.savedTitle"),
                     Messages.get("format.saved") + "\n" + target.toAbsolutePath()
-                            + "\n\n" + Messages.get("reports.openIt"),
-                    Messages.get("reports.openItAction"))) {
-                ReportPreview.openExternally(target);
+                            + "\n(" + readableSize(size) + ")\n\n"
+                            + Messages.get("format.savedWhere"),
+                    Messages.get("format.openFolder"))) {
+                openFolder(target.getParent());
             }
         } catch (IllegalArgumentException ex) {
             // The report had nothing of the kind this format needs, which is worth
@@ -668,6 +665,31 @@ public final class ReportsScreen implements Refreshable {
             Ui.warn(Messages.get("format.saveTitle"), ex.getMessage());
         } catch (IOException | RuntimeException ex) {
             Ui.error(Messages.get("format.couldNotSave"), ex);
+        }
+    }
+
+    /** A size a teacher can read, for the confirmation. */
+    private static String readableSize(long bytes) {
+        if (bytes < 1024) {
+            return bytes + " bytes";
+        }
+        if (bytes < 1024 * 1024) {
+            return Math.round(bytes / 1024.0) + " KB";
+        }
+        return String.format(java.util.Locale.ROOT, "%.1f MB", bytes / (1024.0 * 1024.0));
+    }
+
+    /** Opens a folder in the computer's file browser. */
+    private static void openFolder(java.nio.file.Path folder) {
+        if (folder == null) {
+            return;
+        }
+        try {
+            java.awt.Desktop.getDesktop().open(folder.toFile());
+        } catch (IOException | RuntimeException ex) {
+            // UnsupportedOperationException is a RuntimeException, so it is covered.
+            // Not worth an error dialog: the path was already shown to the teacher.
+            Ui.info(Messages.get("format.savedTitle"), folder.toAbsolutePath().toString());
         }
     }
 

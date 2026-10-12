@@ -136,6 +136,8 @@ public final class UiSmokeTest {
             }
 
             checkSaveAsButtonsExist(scene, shell);
+            checkSaveFolderAdvice();
+            checkSaveDialogLaysOut(context);
 
             // Builds again for every screen, to catch rebuild-only mistakes.
             for (String key : keys) {                boolean ok = true;
@@ -548,6 +550,108 @@ public final class UiSmokeTest {
                         && DocumentFormat.EXCEL.filterLabel().contains("xlsx"));
         check("the two formats are told apart by their extensions",
                 !DocumentFormat.WORD.extension().equals(DocumentFormat.EXCEL.extension()));
+    }
+
+    /**
+     * Checks the advice the save dialog gives about a folder.
+     *
+     * <p>The dialog exists because the Windows one refuses to save on some
+     * computers. It tells the teacher whether a folder can be written to before they
+     * try, so this checks that advice is right for a folder that works, a folder
+     * that does not exist yet, and plainly wrong input.
+     */
+    private void checkSaveFolderAdvice() {
+        java.nio.file.Path home = java.nio.file.Path.of(System.getProperty("user.home"));
+        java.nio.file.Path documents = home.resolve("Documents");
+        if (!java.nio.file.Files.isDirectory(documents)) {
+            check("a Documents folder exists to test the save advice", false);
+            return;
+        }
+
+        javafx.scene.control.Label label = new javafx.scene.control.Label();
+        boolean problem = app.kinderjournal.ui.SaveLocationDialog
+                .describeFolder(documents.toString(), label);
+        check("the save dialog accepts a folder that can be written to", !problem);
+        check("and says which folder it will use", label.getText().contains("Documents"));
+
+        problem = app.kinderjournal.ui.SaveLocationDialog
+                .describeFolder(documents.resolve("KinderJournal-new-subfolder").toString(), label);
+        check("the save dialog offers to create a folder that is not there yet", !problem);
+        check("and says it will be created", !label.getText().isBlank());
+
+        problem = app.kinderjournal.ui.SaveLocationDialog.describeFolder("", label);
+        check("the save dialog asks for a folder when the box is empty", problem);
+
+        // A name Windows cannot use, to be sure it is refused rather than crashing.
+        problem = app.kinderjournal.ui.SaveLocationDialog.describeFolder("::::", label);
+        check("the save dialog refuses an impossible folder name", problem);
+
+        // A file where a folder should be.
+        try {
+            java.nio.file.Path file = java.nio.file.Files.createTempFile("kj-not-a-folder-", ".txt");
+            problem = app.kinderjournal.ui.SaveLocationDialog
+                    .describeFolder(file.toString(), label);
+            check("the save dialog refuses a path that is a file", problem);
+            java.nio.file.Files.deleteIfExists(file);
+        } catch (java.io.IOException ex) {
+            check("a temporary file could be made for the save advice check: " + ex, false);
+        }
+    }
+
+    /**
+     * Checks the save dialog lays out with a status line that says something.
+     *
+     * <p>A blank status reads as a fault, and the dialog is the only way to save a
+     * report on a computer whose Windows save dialog refuses every folder, so it has
+     * to be right.
+     */
+    private void checkSaveDialogLaysOut(AppContext context) {
+        var dialog = app.kinderjournal.ui.SaveLocationDialog.forTesting(
+                DocumentFormat.WORD, "Test-report.docx", context);
+        javafx.scene.layout.VBox body = dialog.buildBody();
+        Scene scene = new Scene(body);
+        scene.getStylesheets().addAll(Styles.stylesheet());
+        body.applyCss();
+        body.layout();
+
+        List<String> labels = new ArrayList<>();
+        collectButtonLabels(body, labels);
+        labels.removeIf(String::isBlank);
+
+        check("the save dialog offers a Save button",
+                labels.stream().anyMatch(text -> text.equals(Messages.get("format.save"))));
+        check("the save dialog offers a Cancel button",
+                labels.stream().anyMatch(text -> text.equals(Messages.get("common.cancel"))));
+        check("the save dialog offers to browse for a folder",
+                labels.stream().anyMatch(text -> text.equals(Messages.get("format.browse"))));
+
+        // The file name lives in a text field, so it is found by looking for fields
+        // rather than for buttons.
+        List<String> fields = new ArrayList<>();
+        collectFieldText(body, fields);
+        check("the save dialog suggests the report's file name",
+                fields.stream().anyMatch(text -> text.endsWith(".docx")));
+        check("the save dialog offers a folder to save in",
+                fields.stream().anyMatch(text -> text.contains("\\") || text.contains("/")));
+
+        check("the save dialog names some places to save to",
+                body.getChildren().stream()
+                        .anyMatch(node -> node instanceof javafx.scene.control.ListView<?> list
+                                && list.getItems().size() >= 3));
+        check("the save dialog asks for enough width to be usable",
+                body.prefWidth(-1) > 400);
+    }
+
+    /** The text in every text field of a node tree. */
+    private static void collectFieldText(javafx.scene.Node node, List<String> sink) {
+        if (node instanceof javafx.scene.control.TextField field) {
+            sink.add(field.getText() == null ? "" : field.getText());
+        }
+        if (node instanceof javafx.scene.Parent parent) {
+            for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) {
+                collectFieldText(child, sink);
+            }
+        }
     }
 
     /** Every button caption in a node tree. */

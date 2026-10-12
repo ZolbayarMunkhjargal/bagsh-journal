@@ -238,6 +238,27 @@ of prose is no use to anyone, and the child history is a dated list of entries
 rather than a table. If a report has no table at all, the Excel button is not
 shown rather than producing an empty file.
 
+#### Saving a report
+
+The two buttons open KinderJournal's **own** save dialog rather than the Windows
+one, and that is deliberate.
+
+`javafx.stage.FileChooser` is a thin wrapper around the Windows common dialog
+(`com.sun.glass.ui.win.WinCommonDialogs`). On some computers that dialog refuses to
+save anywhere at all, reporting *"You don't have permission to save in this
+location"* for every folder - including folders the program itself writes to
+without any trouble. Nothing the program does changes it, because the refusal comes
+from the dialog rather than from the file system.
+
+So the app asks for the destination itself: type or paste a folder, click one of
+the common places, or pick from the drives on this computer. It says whether the
+folder can be written to *before* you commit, and if a save does fail it shows the
+real Windows error rather than a vague message. The last folder used is remembered,
+so the second report is one click.
+
+The plain **Browse...** button still offers the Windows chooser, for computers where
+it behaves.
+
 #### Why there is no document library
 
 `.docx` and `.xlsx` are ZIP archives of XML, so the program writes them directly
