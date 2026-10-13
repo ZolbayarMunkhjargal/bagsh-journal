@@ -63,6 +63,9 @@ public final class AttendanceScreen implements Refreshable {
 
     private View view = View.DAY;
     private LocalDate date;
+
+    /** The child whose row is marked when arriving from a search result. */
+    private long highlightedChildId;
     private LocalDate summaryFrom;
     private LocalDate summaryTo;
     private boolean dirty;
@@ -117,6 +120,33 @@ public final class AttendanceScreen implements Refreshable {
         refreshing = false;
         context.setSelectedDate(target);
         refresh();
+    }
+
+    /**
+     * Opens the register on a date and marks one child's row.
+     *
+     * <p>Used when arriving from a search result for a day's attendance. Without the
+     * marker the screen opens on the right date but says nothing about which child the
+     * click was for, which leaves the teacher to hunt down the row themselves.
+     */
+    public void goToChildOnDate(LocalDate target, long childId) {
+        this.highlightedChildId = childId;
+        goToDate(target);
+    }
+
+    private void applyRowStyle(GridPane grid, Choices.AttendanceStatus status, long childId) {
+        String background = switch (status) {
+            case PRESENT -> "transparent";
+            case ABSENT -> "#fffafa";
+            case LATE -> "#fffdf7";
+            case EXCUSED -> "#fbfaff";
+        };
+        if (childId != 0 && childId == highlightedChildId) {
+            // The row the teacher arrived for: a tinted band, so it is found at once.
+            background = "#e3f2ef";
+        }
+        grid.setStyle("-fx-border-color: transparent transparent #eef1f4 transparent;"
+                + " -fx-background-color: " + background + ";");
     }
 
     // ------------------------------------------------------------------- build
@@ -403,7 +433,7 @@ public final class AttendanceScreen implements Refreshable {
                     }
                     data.setStatus(status);
                     markDirty();
-                    applyRowStyle(grid, status);
+                    applyRowStyle(grid, status, data.child().getId());
                 });
                 buttons.put(status, button);
                 marks.getChildren().add(button);
@@ -415,20 +445,11 @@ public final class AttendanceScreen implements Refreshable {
             times.setAlignment(Pos.CENTER_LEFT);
             grid.add(times, 4, 0);
 
-            applyRowStyle(grid, data.status());
+            applyRowStyle(grid, data.status(), data.child().getId());
             return grid;
         }
 
-        private void applyRowStyle(GridPane grid, Choices.AttendanceStatus status) {
-            String background = switch (status) {
-                case PRESENT -> "transparent";
-                case ABSENT -> "#fffafa";
-                case LATE -> "#fffdf7";
-                case EXCUSED -> "#fbfaff";
-            };
-            grid.setStyle("-fx-border-color: transparent transparent #eef1f4 transparent;"
-                    + " -fx-background-color: " + background + ";");
-        }
+
     }
 
     // ----------------------------------------------------------------- saving

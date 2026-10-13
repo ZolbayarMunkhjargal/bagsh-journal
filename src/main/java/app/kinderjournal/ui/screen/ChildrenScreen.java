@@ -508,6 +508,24 @@ public final class ChildrenScreen implements Refreshable {
         openForm(null);
     }
 
+    /**
+     * Shows one child's profile.
+     *
+     * <p>Used when arriving from a search result for a child, so a click lands on the
+     * child that was searched for rather than on whichever profile happened to be open.
+     *
+     * @return true when the child was found and selected
+     */
+    public boolean selectChild(Child child) {
+        if (child == null || context.repo().children().find(child.getId()) == null) {
+            return false;
+        }
+        selectedChildId = child.getId();
+        context.setCurrentChild(child);
+        refresh();
+        return true;
+    }
+
     private void openEditForm(Child child) {
         openForm(child);
     }

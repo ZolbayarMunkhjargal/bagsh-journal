@@ -365,6 +365,23 @@ public final class ObservationsScreen implements Refreshable {
         openForm(null, child);
     }
 
+    /**
+     * Opens one observation for reading and editing.
+     *
+     * <p>Used when arriving from a search result, so a click on a match lands on the
+     * record itself rather than on the list it lives in.
+     *
+     * @return true when the observation was found and opened
+     */
+    public boolean openRecord(long observationId) {
+        Observation existing = context.repo().observations().find(observationId);
+        if (existing == null) {
+            return false;
+        }
+        openForm(existing, null);
+        return true;
+    }
+
     private void openEditForm(Observation existing) {
         openForm(existing, null);
     }

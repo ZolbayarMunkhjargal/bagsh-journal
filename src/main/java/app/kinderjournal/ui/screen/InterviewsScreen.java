@@ -420,6 +420,23 @@ public final class InterviewsScreen implements Refreshable {
         openForm(null, child);
     }
 
+    /**
+     * Opens one interview for reading and editing.
+     *
+     * <p>Used when arriving from a search result, so a click on a match lands on the
+     * record itself rather than on the list it lives in.
+     *
+     * @return true when the interview was found and opened
+     */
+    public boolean openRecord(long interviewId) {
+        Interview existing = context.repo().interviews().find(interviewId);
+        if (existing == null) {
+            return false;
+        }
+        openForm(existing, null);
+        return true;
+    }
+
     private void openEditForm(Interview existing) {
         openForm(existing, null);
     }

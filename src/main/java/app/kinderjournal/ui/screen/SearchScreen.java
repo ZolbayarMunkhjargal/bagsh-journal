@@ -393,7 +393,15 @@ public final class SearchScreen implements Refreshable {
         return Dates.monthName(yearMonth.getYear(), yearMonth.getMonthValue());
     }
 
-    /** Opens the record behind a search hit. */
+    /**
+     * Opens the record behind a search hit.
+     *
+     * <p>Every branch lands on the record the teacher clicked, not merely on the
+     * screen it belongs to. Three of them used to do the latter, which made a result
+     * look as though it had done nothing: an observation or an interview opened the
+     * list it was in, an activity plan opened a <em>blank</em> form dated to the hit,
+     * and an attendance mark opened the child's history instead of the register.
+     */
     private void openHit(SearchHit hit) {
         Child child = hit.childId() > 0 ? context.repo().children().find(hit.childId()) : null;
         switch (hit.kind()) {
@@ -401,36 +409,75 @@ public final class SearchScreen implements Refreshable {
                 if (child != null) {
                     context.setCurrentChild(child);
                 }
-                shell.show("observations");
+                if (!openOn("observations", target -> target instanceof ObservationsScreen observations
+                        && observations.openRecord(hit.recordId()))) {
+                    // The record has gone since the search ran; say so rather than
+                    // showing a screen with no sign of it.
+                    warnRecordMissing(hit);
+                }
             }
             case INTERVIEW -> {
                 if (child != null) {
                     context.setCurrentChild(child);
                 }
-                shell.show("interviews");
-            }
-            case PLAN -> shell.showAnd("plans", target -> {
-                if (target instanceof PlansScreen plans && !Text.isBlank(hit.date())) {
-                    plans.openNewForm(Dates.fromIso(hit.date()));
+                if (!openOn("interviews", target -> target instanceof InterviewsScreen interviews
+                        && interviews.openRecord(hit.recordId()))) {
+                    warnRecordMissing(hit);
                 }
-            });
+            }
+            case PLAN -> {
+                if (!openOn("plans", target -> target instanceof PlansScreen plans
+                        && plans.openRecord(hit.recordId()))) {
+                    warnRecordMissing(hit);
+                }
+            }
             case ATTENDANCE -> {
                 if (child != null) {
                     context.setCurrentChild(child);
                 }
-                shell.showAnd("history", target -> {
-                    if (target instanceof HistoryScreen history && child != null) {
-                        history.selectChild(child);
-                    }
-                });
+                LocalDate day = Dates.fromIso(hit.date());
+                if (day == null) {
+                    shell.show("attendance");
+                    return;
+                }
+                if (!openOn("attendance", target -> target instanceof AttendanceScreen attendance
+                        && selectDay(attendance, day, hit.childId()))) {
+                    warnRecordMissing(hit);
+                }
             }
             default -> {
                 if (child != null) {
                     context.setCurrentChild(child);
-                    shell.show("children");
+                }
+                if (!openOn("children", target -> target instanceof ChildrenScreen children
+                        && children.selectChild(child))) {
+                    warnRecordMissing(hit);
                 }
             }
         }
+    }
+
+    /**
+     * Opens a screen and lets the caller open a record on it.
+     *
+     * @return true when the screen was built and the record was found
+     */
+    private boolean openOn(String key, java.util.function.Predicate<Refreshable> open) {
+        boolean[] opened = {false};
+        shell.showAnd(key, target -> opened[0] = open.test(target));
+        return opened[0];
+    }
+
+    /** Moves the register to a day, marking the child the hit was for. */
+    private static boolean selectDay(AttendanceScreen attendance, LocalDate day, long childId) {
+        attendance.goToChildOnDate(day, childId);
+        return true;
+    }
+
+    /** Says the record has gone, rather than leaving the teacher on a silent screen. */
+    private static void warnRecordMissing(SearchHit hit) {
+        Ui.warn(Messages.get("search.recordGone"),
+                Messages.get("search.recordGoneBody", hit.kind().label(), hit.title()));
     }
 
     private void sendToReport() {

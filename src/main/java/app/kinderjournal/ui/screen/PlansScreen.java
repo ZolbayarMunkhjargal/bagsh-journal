@@ -619,6 +619,24 @@ public final class PlansScreen implements Refreshable {
 
     // -------------------------------------------------------------------- form
 
+    /**
+     * Opens one activity plan for reading and editing.
+     *
+     * <p>Used when arriving from a search result. It opened a blank form dated to the
+     * hit before, which looked as though the click had gone to the wrong place: the
+     * teacher asked for a record and got an empty page.
+     *
+     * @return true when the plan was found and opened
+     */
+    public boolean openRecord(long planId) {
+        LessonPlan existing = context.repo().plans().find(planId);
+        if (existing == null) {
+            return false;
+        }
+        openForm(existing, null);
+        return true;
+    }
+
     private void openForm(LessonPlan existing, LocalDate defaultDate) {
         if (existing == null) {
             LessonPlan draft = new LessonPlan();

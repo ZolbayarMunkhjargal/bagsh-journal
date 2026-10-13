@@ -566,6 +566,57 @@ public final class SelfTest {
                 Repository.buildSnippet("a very long text about communication skills",
                         "communication").contains("communication"));
         check("snippet handles no match", !Repository.buildSnippet("some text", "absent").isEmpty());
+
+        testSearchHitsLeadToTheirRecord(repo);
+    }
+
+    /**
+     * Checks that every search result names a record which can still be opened.
+     *
+     * <p>This is what clicking a result depends on. The screen used to ignore the
+     * record entirely for observations, interviews and plans - an activity plan even
+     * opened a blank form - so a click appeared to do nothing. A hit whose record id
+     * does not resolve would leave the teacher on a screen with no sign of what they
+     * clicked, which is why the screen now says so instead of doing nothing.
+     */
+    private static void testSearchHitsLeadToTheirRecord(Repository repo) {
+        List<SearchHit> hits = repo.search(Repository.SearchQuery.everything("the"));
+        check("a broad search returns results to check", !hits.isEmpty());
+
+        int checked = 0;
+        int missing = 0;
+        int withNoId = 0;
+        java.util.Set<HistoryEntry.Kind> kinds = new java.util.LinkedHashSet<>();
+
+        for (SearchHit hit : hits) {
+            kinds.add(hit.kind());
+            if (hit.recordId() <= 0) {
+                withNoId++;
+                continue;
+            }
+            boolean found = switch (hit.kind()) {
+                case OBSERVATION -> repo.observations().find(hit.recordId()) != null;
+                case INTERVIEW -> repo.interviews().find(hit.recordId()) != null;
+                case PLAN -> repo.plans().find(hit.recordId()) != null;
+                // An attendance mark is opened by its day and child, both of which
+                // have to be present for the register to be pointed at the right row.
+                case ATTENDANCE -> repo.children().find(hit.childId()) != null
+                        && !app.kinderjournal.util.Text.isBlank(hit.date());
+                // A child profile is opened on the child itself.
+                case NOTE -> repo.children().find(hit.recordId()) != null;
+            };
+            checked++;
+            if (!found) {
+                missing++;
+                System.out.println("        hit points at a record that is not there: "
+                        + hit.kind() + " id=" + hit.recordId() + " " + hit.title());
+            }
+        }
+
+        check("search results cover several record types (" + kinds + ")", kinds.size() >= 3);
+        check("every search result names a record (" + checked + " checked, "
+                + withNoId + " without an id)", checked > 0 && withNoId == 0);
+        check("every named record can be opened (" + missing + " missing)", missing == 0);
     }
 
     private static void testReferentialIntegrity(Repository repo) {
