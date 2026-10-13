@@ -897,6 +897,12 @@ public final class SelfTest {
         check("the Excel file covers every table in the report",
                 doc.tables().size() == 1);
 
+        // Photos have to survive into Word and Excel. The report prints them as data
+        // URIs, which neither format can hold, so each has to become a real image
+        // part inside the package. This is the check that would have caught them
+        // quietly disappearing, which is what a teacher reported.
+        checkPhotosReachTheOfficeFiles(temp);
+
         // A report with no tables cannot become a spreadsheet, and should say so
         // rather than write a file Excel would reject.
         app.kinderjournal.report.ReportDocument prose = app.kinderjournal.report.ReportDocumentParser
@@ -978,6 +984,109 @@ public final class SelfTest {
                 }
             }
         }
+    }
+
+    /**
+     * Checks that a report's photos reach the Word and Excel files.
+     *
+     * <p>The report carries photos as data URIs inside its HTML, which is right for
+     * a self-contained web page and useless to Word or Excel: both need the picture
+     * as a real file inside their own package, tied to the document by a
+     * relationship. Reports were being saved with the pictures silently dropped, so
+     * this checks the parts, the relationships and the drawing that places them.
+     */
+    private static void checkPhotosReachTheOfficeFiles(Path temp) throws IOException {
+        // A one-pixel PNG, small enough to keep the test data readable.
+        String png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+        String html = """
+                <!DOCTYPE html><html><body>
+                <div class="report-header"><h1>Observation report</h1>
+                <div class="subtitle">Anna Berg</div></div>
+                <h2>Profile</h2>
+                <div class="summary-grid"><img src="data:image/png;base64,%s" style="width:34mm">
+                <table><tbody><tr><th>Name</th><td>Anna Berg</td></tr></tbody></table>
+                </div>
+                <h2>Our bean shoots</h2>
+                <div class="photos">
+                  <div class="photo" style="width:46mm"><img src="data:image/png;base64,%s" style="width:46mm">
+                    <div class="caption">Our bean shoots</div>
+                  </div>
+                </div>
+                </body></html>
+                """.formatted(png, png);
+
+        app.kinderjournal.report.ReportDocument doc =
+                app.kinderjournal.report.ReportDocumentParser.parse(html);
+        check("photos are found in a report", doc.images().size() == 2);
+        check("a photo keeps its caption",
+                doc.images().stream().anyMatch(image -> image.caption().equals("Our bean shoots")));
+        check("a photo keeps its bytes",
+                doc.images().stream().allMatch(image -> image.data().length > 0));
+        check("the photo's kind is taken from the data URI",
+                doc.images().stream().allMatch(image -> image.extension().equals("png")));
+
+        // Photos are placed under their own heading in the saved documents, so they
+        // are not lost among the text.
+        check("photos are gathered under a heading in the saved document",
+                doc.plainText().contains("[photo"));
+
+        Path word = temp.resolve("photos-test.docx");
+        Path excel = temp.resolve("photos-test.xlsx");
+        app.kinderjournal.report.WordDocument.write(doc, word);
+        app.kinderjournal.report.ExcelWorkbook.write(doc, excel);
+
+        Map<String, String> wordParts = readPackage(word);
+        List<String> wordMedia = wordParts.keySet().stream()
+                .filter(name -> name.startsWith("word/media/")).toList();
+        check("the Word file carries a photo for each picture in the report",
+                wordMedia.size() == 2);
+        check("the Word file declares the picture type",
+                wordParts.get("[Content_Types].xml").contains("image/png"));
+        check("the Word file links each photo to its part",
+                countOf(wordParts.get("word/_rels/document.xml.rels"),
+                        "relationships/image") == 2);
+        check("the Word document draws each photo",
+                countOf(wordParts.get("word/document.xml"), "<w:drawing>") == 2);
+        check("each drawing points at its photo",
+                countOf(wordParts.get("word/document.xml"), "<a:blip r:embed=") == 2);
+        check("the Word file states a size for each photo, in both places Word wants",
+                countOf(wordParts.get("word/document.xml"), "<wp:extent cx=") == 2
+                        && countOf(wordParts.get("word/document.xml"), "<a:ext cx=") == 2);
+
+        Map<String, String> excelParts = readPackage(excel);
+        check("the Excel file carries a photo for each picture in the report",
+                excelParts.keySet().stream().filter(n -> n.startsWith("xl/media/")).count() == 2);
+        check("the Excel file declares the picture type",
+                excelParts.get("[Content_Types].xml").contains("image/png"));
+        check("the Excel file declares its drawing",
+                excelParts.get("[Content_Types].xml").contains("drawing+xml"));
+        check("the Excel drawing places each photo",
+                countOf(excelParts.get("xl/drawings/drawing1.xml"), "<xdr:pic>") == 2);
+        check("the Excel drawing links each photo to its part",
+                countOf(excelParts.get("xl/drawings/_rels/drawing1.xml.rels"),
+                        "relationships/image") == 2);
+        check("the photos get a sheet of their own",
+                excelParts.get("xl/workbook.xml").contains("Photos"));
+        // A worksheet must reference the drawing, or the pictures do not appear.
+        check("the photo sheet references the drawing",
+                excelParts.get("xl/worksheets/sheet2.xml").contains("<drawing"));
+        check("that reference resolves to the drawing part",
+                excelParts.get("xl/worksheets/_rels/sheet2.xml.rels")
+                        .contains("drawings/drawing1.xml"));
+    }
+
+    /** How many times a piece of text appears. */
+    private static int countOf(String haystack, String needle) {
+        if (haystack == null || needle.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        int at = haystack.indexOf(needle);
+        while (at >= 0) {
+            count++;
+            at = haystack.indexOf(needle, at + 1);
+        }
+        return count;
     }
 
     /** Reads every part of an OOXML package into memory, keyed by part name. */

@@ -268,6 +268,35 @@ into Documents, Desktop and Downloads on a computer where writing to all three w
 The only reliable test is to write the file, and if Windows refuses, its own reason is
 shown in full.
 
+#### Photos in the saved files
+
+A report carries its photos as data URIs inside the HTML, so a saved `.html` file is
+self-contained. Word and Excel cannot hold a data URI, so each picture is embedded
+as a real image part inside the document's own package, linked to the document by a
+relationship and placed by a drawing that states its size.
+
+In Word each photo becomes a DrawingML picture, sized from the image's own pixel
+dimensions so its shape is right. In Excel the photos get a sheet of their own at the
+end, one per row with its caption beside it, anchored to a cell by a drawing.
+
+The report prints a photo inside the entry it belongs to. Word and Excel have no
+flowing layout to put it back into, so the pictures are gathered at the end of the
+saved document under a "Photos" heading, still in order and still with their captions.
+
+Two traps worth knowing if this is ever changed:
+
+- A gallery of photos is nested `div`s three deep, so a lazy regular expression cannot
+  find its end. The end is found by counting `div` tags. Matching only the first inner
+  close leaves the rest of the gallery in the body, where its photos are found a
+  second time and embedded twice.
+- A picture has to be declared in `[Content_Types].xml`, linked from a `.rels` part,
+  and referenced by a `<drawing>` element. Missing any one of the three gives a file
+  that either refuses to open or opens with no pictures.
+
+`python tools\check_report_photos.py <folder>` opens the written files with
+python-docx and openpyxl and compares the photos embedded against the photos the
+report held.
+
 #### Why there is no document library
 
 `.docx` and `.xlsx` are ZIP archives of XML, so the program writes them directly

@@ -47,6 +47,26 @@ final class OoxmlPackage implements AutoCloseable {
     }
 
     /**
+     * Writes a part that is not text, such as a photo.
+     *
+     * <p>Stored rather than deflated: a PNG or JPEG is already compressed, so
+     * deflating it again costs time and saves almost nothing.
+     */
+    void partBinary(String name, byte[] bytes) throws IOException {
+        ZipEntry entry = new ZipEntry(name);
+        entry.setTime(1_700_000_000_000L);
+        entry.setMethod(ZipEntry.STORED);
+        entry.setSize(bytes.length);
+        entry.setCompressedSize(bytes.length);
+        CRC32 crc = new CRC32();
+        crc.update(bytes);
+        entry.setCrc(crc.getValue());
+        zip.putNextEntry(entry);
+        zip.write(bytes);
+        zip.closeEntry();
+    }
+
+    /**
      * Writes one part of the package.
      *
      * @param stored true to store the entry uncompressed, which the format requires

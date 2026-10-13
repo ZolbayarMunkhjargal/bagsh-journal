@@ -21,6 +21,12 @@ public final class ExcelWorkbook {
     private static final int MAX_COLUMN_WIDTH = 60;
     private static final int MIN_COLUMN_WIDTH = 9;
 
+    /** Photos are placed this wide, which leaves room for the caption beside them. */
+    private static final long PICTURE_WIDTH_MM = 90;
+
+    /** English Metric Units, the unit DrawingML measures in: 36000 to the millimetre. */
+    private static final long EMU_PER_MM = 36_000L;
+
     private ExcelWorkbook() {
     }
 
@@ -33,22 +39,194 @@ public final class ExcelWorkbook {
         }
 
         List<String> names = sheetNames(document, tables);
+        List<ReportDocument.ImageBlock> photos = document.images();
+        if (!photos.isEmpty()) {
+            // A spreadsheet has no flowing text to put a picture in, so the photos
+            // get a sheet of their own at the end: one per row, with its caption.
+            names = new ArrayList<>(names);
+            names.add(uniqueSheetName(names, app.kinderjournal.i18n.Messages
+                    .get("report.heading.photos")));
+        }
+        int tableSheets = tables.size();
+        int photoSheet = photos.isEmpty() ? -1 : tableSheets + 1;
+
         try (OoxmlPackage pkg = new OoxmlPackage(file)) {
-            pkg.part("[Content_Types].xml", contentTypes(tables.size()), true);
+            pkg.part("[Content_Types].xml", contentTypes(names.size(), photos), true);
             pkg.part("_rels/.rels", packageRels(), false);
             pkg.part("xl/workbook.xml", workbook(names), false);
-            pkg.part("xl/_rels/workbook.xml.rels", workbookRels(tables.size()), false);
+            pkg.part("xl/_rels/workbook.xml.rels", workbookRels(names.size()), false);
             pkg.part("xl/styles.xml", styles(), false);
-            for (int i = 0; i < tables.size(); i++) {
+            for (int i = 0; i < tableSheets; i++) {
                 pkg.part("xl/worksheets/sheet" + (i + 1) + ".xml",
                         sheet(document, tables.get(i)), false);
+            }
+            if (photoSheet > 0) {
+                pkg.part("xl/worksheets/sheet" + photoSheet + ".xml", photoSheet(photos), false);
+                pkg.part("xl/worksheets/_rels/sheet" + photoSheet + ".xml.rels",
+                        sheetRels(), false);
+                pkg.part("xl/drawings/drawing1.xml", drawing(photos), false);
+                pkg.part("xl/drawings/_rels/drawing1.xml.rels",
+                        drawingRels(photos), false);
+                for (int i = 0; i < photos.size(); i++) {
+                    pkg.partBinary("xl/media/" + mediaName(i, photos.get(i)),
+                            photos.get(i).data());
+                }
             }
         }
     }
 
+    /** The name a photo's bytes are stored under inside the package. */
+    private static String mediaName(int index, ReportDocument.ImageBlock image) {
+        return String.format(java.util.Locale.ROOT, "image%d.%s", index + 1, image.extension());
+    }
+
+    /** A sheet name that is not already taken. */
+    private static String uniqueSheetName(List<String> existing, String wanted) {
+        String base = wanted.length() > MAX_SHEET_NAME ? wanted.substring(0, MAX_SHEET_NAME).trim()
+                : wanted;
+        if (base.isBlank()) {
+            base = "Photos";
+        }
+        String candidate = base;
+        int suffix = 2;
+        while (existing.contains(candidate)) {
+            String tail = " (" + suffix + ")";
+            candidate = base.substring(0, Math.min(base.length(),
+                    MAX_SHEET_NAME - tail.length())) + tail;
+            suffix++;
+        }
+        return candidate;
+    }
+
+    // -------------------------------------------------------------- photo sheet
+
+    /**
+     * The sheet the photos are placed on.
+     *
+     * <p>Each photo sits in its own row, anchored to the cell at column A. The cells
+     * also carry the caption and the size, so the sheet still says something useful
+     * if the pictures cannot be drawn for any reason.
+     */
+    private static String photoSheet(List<ReportDocument.ImageBlock> photos) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("""
+                <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+                """);
+        sb.append("<cols><col min=\"1\" max=\"1\" width=\"3\" customWidth=\"1\"/>")
+                .append("<col min=\"2\" max=\"2\" width=\"34\" customWidth=\"1\"/>")
+                .append("<col min=\"3\" max=\"3\" width=\"40\" customWidth=\"1\"/></cols>");
+        sb.append("<sheetData>");
+        for (int i = 0; i < photos.size(); i++) {
+            ReportDocument.ImageBlock photo = photos.get(i);
+            int[] pixels = ReportPhotos.pixelSize(photo.data());
+            String size = pixels[0] > 0 ? pixels[0] + " x " + pixels[1] + " px" : "";
+            int row = rowFor(i);
+            sb.append("<row r=\"").append(row).append("\" ht=\"96\" customHeight=\"1\">");
+            sb.append("<c r=\"B").append(row).append("\" s=\"4\" t=\"inlineStr\"><is><t xml:space=\"preserve\">")
+                    .append(OoxmlPackage.escape(photo.caption().isBlank()
+                            ? app.kinderjournal.i18n.Messages.get("report.photo")
+                            : photo.caption()))
+                    .append("</t></is></c>");
+            if (!size.isBlank()) {
+                sb.append("<c r=\"C").append(row).append("\" s=\"4\" t=\"inlineStr\"><is><t>")
+                        .append(OoxmlPackage.escape(size)).append("</t></is></c>");
+            }
+            sb.append("</row>");
+        }
+        sb.append("</sheetData>");
+        // The drawing has to be referenced from the sheet, or the pictures vanish.
+        sb.append("<drawing r:id=\"rId1\"/>");
+        return sb.append("</worksheet>").toString();
+    }
+
+    /** The row a photo is anchored to: three rows apart, so each has room. */
+    private static int rowFor(int index) {
+        return 1 + index * 6;
+    }
+
+    private static String sheetRels() {
+        return """
+                <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>
+                </Relationships>""";
+    }
+
+    /**
+     * The drawing: where each photo sits and how big it is.
+     *
+     * <p>Anchored in two ways on purpose - to a cell for the position and to English
+     * Metric Units for the size - because that is how a spreadsheet places a picture.
+     * The size is given twice, once as the extent and once inside the transform,
+     * which is what Excel expects to find.
+     */
+    private static String drawing(List<ReportDocument.ImageBlock> photos) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("""
+                <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                <xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+                          xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                """);
+        for (int i = 0; i < photos.size(); i++) {
+            ReportDocument.ImageBlock photo = photos.get(i);
+            int[] pixels = ReportPhotos.pixelSize(photo.data());
+            long widthEmu = PICTURE_WIDTH_MM * EMU_PER_MM;
+            long heightEmu = pixels[0] > 0 && pixels[1] > 0
+                    ? Math.round(widthEmu * (pixels[1] / (double) pixels[0]))
+                    : widthEmu;
+            int row = rowFor(i) - 1;             // anchors are zero-based
+            String name = "KinderJournal photo " + (i + 1);
+            long id = i + 1L;
+
+            sb.append("<xdr:oneCellAnchor>")
+                    .append("<xdr:from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff>")
+                    .append("<xdr:row>").append(row).append("</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>")
+                    .append("<xdr:ext cx=\"").append(widthEmu).append("\" cy=\"")
+                    .append(heightEmu).append("\"/>")
+                    .append("<xdr:pic>")
+                    .append("<xdr:nvPicPr>")
+                    .append("<xdr:cNvPr id=\"").append(id).append("\" name=\"")
+                    .append(OoxmlPackage.escape(name)).append("\"/>")
+                    .append("<xdr:cNvPicPr><a:picLocks noChangeAspect=\"1\"/></xdr:cNvPicPr>")
+                    .append("</xdr:nvPicPr>")
+                    .append("<xdr:blipFill>")
+                    .append("<a:blip xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:embed=\"")
+                    .append("rId").append(i + 1).append("\"/>")
+                    .append("<a:stretch><a:fillRect/></a:stretch>")
+                    .append("</xdr:blipFill>")
+                    .append("<xdr:spPr>")
+                    .append("<a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"").append(widthEmu)
+                    .append("\" cy=\"").append(heightEmu).append("\"/></a:xfrm>")
+                    .append("<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom>")
+                    .append("</xdr:spPr>")
+                    .append("</xdr:pic>")
+                    .append("<xdr:clientData/>")
+                    .append("</xdr:oneCellAnchor>");
+        }
+        return sb.append("</xdr:wsDr>").toString();
+    }
+
+    private static String drawingRels(List<ReportDocument.ImageBlock> photos) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("""
+                <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                """);
+        for (int i = 0; i < photos.size(); i++) {
+            sb.append("  <Relationship Id=\"rId").append(i + 1)
+                    .append("\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/")
+                    .append("relationships/image\" Target=\"../media/")
+                    .append(mediaName(i, photos.get(i))).append("\"/>\n");
+        }
+        return sb.append("</Relationships>").toString();
+    }
+
     // ------------------------------------------------------------------- parts
 
-    private static String contentTypes(int sheetCount) {
+    private static String contentTypes(int sheetCount,
+                                         List<ReportDocument.ImageBlock> photos) {
         StringBuilder sb = new StringBuilder();
         sb.append("""
                 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -62,6 +240,19 @@ public final class ExcelWorkbook {
             sb.append("  <Override PartName=\"/xl/worksheets/sheet").append(i)
                     .append(".xml\" ContentType=\"application/vnd.openxmlformats-")
                     .append("officedocument.spreadsheetml.worksheet+xml\"/>\n");
+        }
+        if (!photos.isEmpty()) {
+            // Every image type present has to be declared, and so does the drawing,
+            // or Excel refuses to open the file at all.
+            for (String extension : photos.stream()
+                    .map(ReportDocument.ImageBlock::extension).distinct().toList()) {
+                sb.append("  <Default Extension=\"").append(extension)
+                        .append("\" ContentType=\"").append(WordDocument.mimeType(extension))
+                        .append("\"/>\n");
+            }
+            sb.append("  <Override PartName=\"/xl/drawings/drawing1.xml\" ")
+                    .append("ContentType=\"application/vnd.openxmlformats-officedocument.")
+                    .append("drawing+xml\"/>\n");
         }
         return sb.append("</Types>").toString();
     }

@@ -26,8 +26,26 @@ public final class ReportDocument {
         }
     }
 
-    /** A heading, paragraph, table or list from the document body. */
-    public sealed interface Block permits Heading, Paragraph, Bullets, Table {
+    /** A heading, paragraph, table, list or photo from the document body. */
+    public sealed interface Block permits Heading, Paragraph, Bullets, Table, ImageBlock {
+    }
+
+    /**
+     * A photo.
+     *
+     * <p>The report prints photos as data URIs so a saved HTML file is
+     * self-contained. Word and Excel cannot hold a data URI, so the picture is kept
+     * here as its bytes and written into the document as an embedded image.
+     *
+     * @param extension "png", "jpeg" and so on, taken from the data URI
+     * @param data      the decoded image
+     * @param caption   the caption printed under the photo, or empty
+     */
+    public record ImageBlock(String extension, byte[] data, String caption) implements Block {
+
+        public boolean isUsable() {
+            return data != null && data.length > 0;
+        }
     }
 
     public record Heading(int level, String text) implements Block {
@@ -107,6 +125,15 @@ public final class ReportDocument {
         return !tables().isEmpty();
     }
 
+    /** The photos only, in reading order. */
+    public List<ImageBlock> images() {
+        return blocks.stream()
+                .filter(ImageBlock.class::isInstance)
+                .map(ImageBlock.class::cast)
+                .filter(ImageBlock::isUsable)
+                .toList();
+    }
+
     /** Everything as plain text, used by the tests to check nothing was lost. */
     public String plainText() {
         StringBuilder sb = new StringBuilder(title).append('\n').append(subtitle).append('\n');
@@ -122,6 +149,10 @@ public final class ReportDocument {
                 for (List<String> row : table.rows()) {
                     sb.append(String.join(" | ", row)).append('\n');
                 }
+            } else if (block instanceof ImageBlock image) {
+                // Named so a check can prove the photo survived the trip.
+                sb.append("[photo").append(image.caption().isBlank() ? ""
+                        : " " + image.caption()).append("]\n");
             }
         }
         return sb.toString();

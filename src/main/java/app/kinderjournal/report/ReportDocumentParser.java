@@ -1,5 +1,6 @@
 package app.kinderjournal.report;
 
+import app.kinderjournal.i18n.Messages;
 import app.kinderjournal.util.Text;
 
 import java.util.ArrayList;
@@ -64,6 +65,29 @@ public final class ReportDocumentParser {
         String title = firstGroup(TITLE, body);
         String subtitle = firstGroup(SUBTITLE, body);
 
+        // Photos are lifted out before anything else. A gallery is nested divs, which
+        // the block scan below cannot match, and the images inside were being thrown
+        // away with the rest of the markup - which is why a report saved as Word or
+        // Excel arrived with no pictures while the HTML of the same report had them.
+        List<ReportDocument.ImageBlock> photos = new ArrayList<>();
+        for (List<ReportDocument.ImageBlock> gallery : ReportPhotos.galleries(body)) {
+            photos.addAll(gallery);
+        }
+        // Then the photos printed on their own, such as a profile picture. The ones
+        // already taken from a gallery are skipped, or each would be embedded twice.
+        List<int[]> gallerySpans = ReportPhotos.spansOf(body);
+        Matcher loose = ReportPhotos.LOOSE_PHOTO.matcher(body);
+        while (loose.find()) {
+            if (ReportPhotos.insideGallery(gallerySpans, loose.start())) {
+                continue;
+            }
+            ReportDocument.ImageBlock image = ReportPhotos.loose(loose);
+            if (image != null) {
+                photos.add(image);
+            }
+        }
+        body = ReportPhotos.withoutGalleries(body);
+
         List<ReportDocument.Block> blocks = new ArrayList<>();
         Matcher matcher = BLOCK.matcher(body);
         while (matcher.find()) {
@@ -71,7 +95,8 @@ public final class ReportDocumentParser {
                 // The h1 is the title and the subtitle follows it; both are already
                 // captured, so repeating them in the body would print them twice.
                 continue;
-            } else if (matcher.group(2) != null) {                add(blocks, new ReportDocument.Heading(2, text(matcher.group(2))));
+            } else if (matcher.group(2) != null) {
+                add(blocks, new ReportDocument.Heading(2, text(matcher.group(2))));
             } else if (matcher.group(3) != null) {
                 add(blocks, new ReportDocument.Heading(3, text(matcher.group(3))));
             } else if (matcher.group(4) != null) {
@@ -113,6 +138,16 @@ public final class ReportDocumentParser {
                     .map(ReportDocument.Heading::text)
                     .findFirst()
                     .orElse("");
+        }
+
+        // The photos go on one block each at the end of the document, under their own
+        // heading. In the printed report they sit inside the entries they belong to,
+        // which a Word or Excel file cannot do without the pictures being split across
+        // the page wherever the text happens to fall; gathered at the end they stay
+        // with their captions and remain in order.
+        if (!photos.isEmpty()) {
+            blocks.add(new ReportDocument.Heading(2, Messages.get("report.heading.photos")));
+            blocks.addAll(photos);
         }
         return new ReportDocument(title, subtitle, blocks);
     }

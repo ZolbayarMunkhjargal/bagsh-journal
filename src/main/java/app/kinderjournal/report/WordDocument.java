@@ -20,6 +20,9 @@ public final class WordDocument {
     private static final int PAGE_HEIGHT_TWIPS = 16838;
     private static final int MARGIN_TWIPS = 1134;    // 20mm
 
+    /** English Metric Units, the unit DrawingML measures in: 36000 to the millimetre. */
+    private static final long EMU_PER_MM = 36_000L;
+
     private WordDocument() {
     }
 
@@ -30,25 +33,56 @@ public final class WordDocument {
                     app.kinderjournal.i18n.Messages.get("format.onlyText"));
         }
         try (OoxmlPackage pkg = new OoxmlPackage(file)) {
-            pkg.part("[Content_Types].xml", contentTypes(), true);
+            List<String> types = document.images().stream()
+                    .map(ReportDocument.ImageBlock::extension).distinct().toList();
+            pkg.part("[Content_Types].xml", contentTypes(types), true);
             pkg.part("_rels/.rels", packageRels(), false);
             pkg.part("word/document.xml", body(document), false);
             pkg.part("word/styles.xml", styles(), false);
-            pkg.part("word/_rels/document.xml.rels", documentRels(), false);
+            pkg.part("word/_rels/document.xml.rels", documentRels(document.images()), false);
+            // The pictures themselves, as real files inside the package. The HTML
+            // report carries them as data URIs, which mean nothing to Word.
+            for (int i = 0; i < document.images().size(); i++) {
+                pkg.partBinary("word/media/" + mediaName(i, document.images().get(i)),
+                        document.images().get(i).data());
+            }
         }
+    }
+
+    /** The name a photo's bytes are stored under inside the package. */
+    private static String mediaName(int index, ReportDocument.ImageBlock image) {
+        return String.format(java.util.Locale.ROOT, "image%d.%s", index + 1, image.extension());
     }
 
     // ------------------------------------------------------------------- parts
 
-    private static String contentTypes() {
-        return """
+    private static String contentTypes(List<String> imageExtensions) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("""
                 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
                 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
                   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
                   <Default Extension="xml" ContentType="application/xml"/>
                   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
                   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
-                </Types>""";
+                """);
+        // Every image type present must be declared, or Word refuses the file.
+        for (String extension : imageExtensions) {
+            sb.append("  <Default Extension=\"").append(extension).append("\" ContentType=\"")
+                    .append(mimeType(extension)).append("\"/>\n");
+        }
+        return sb.append("</Types>").toString();
+    }
+
+    /** The MIME type for an image extension. */
+    static String mimeType(String extension) {
+        return switch (extension.toLowerCase(java.util.Locale.ROOT)) {
+            case "jpeg", "jpg" -> "image/jpeg";
+            case "gif" -> "image/gif";
+            case "bmp" -> "image/bmp";
+            case "webp" -> "image/webp";
+            default -> "image/png";
+        };
     }
 
     private static String packageRels() {
@@ -59,12 +93,20 @@ public final class WordDocument {
                 </Relationships>""";
     }
 
-    private static String documentRels() {
-        return """
+    private static String documentRels(List<ReportDocument.ImageBlock> images) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("""
                 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
                 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
                   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-                </Relationships>""";
+                """);
+        for (int i = 0; i < images.size(); i++) {
+            sb.append("  <Relationship Id=\"").append("rId").append(i + 2)
+                    .append("\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/")
+                    .append("relationships/image\" Target=\"media/")
+                    .append(mediaName(i, images.get(i))).append("\"/>\n");
+        }
+        return sb.append("</Relationships>").toString();
     }
 
     /**
@@ -104,6 +146,11 @@ public final class WordDocument {
                     <w:pPr><w:spacing w:after="240"/></w:pPr>
                     <w:rPr><w:color w:val="64748B"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr>
                   </w:style>
+                              <w:style w:type="paragraph" w:styleId="Caption">
+                    <w:name w:val="Caption"/><w:basedOn w:val="Normal"/><w:qFormat/>
+                    <w:pPr><w:spacing w:after="160"/></w:pPr>
+                    <w:rPr><w:i/><w:color w:val="64748B"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr>
+                  </w:style>
                   <w:style w:type="paragraph" w:styleId="ListParagraph">
                     <w:name w:val="List Paragraph"/><w:qFormat/>
                     <w:pPr><w:ind w:left="360"/></w:pPr>
@@ -137,10 +184,29 @@ public final class WordDocument {
         StringBuilder sb = new StringBuilder();
         sb.append("""
                 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-                <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+                            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                            xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
                   <w:body>
                 """);
+        drawBody(document, sb);
+        // The section properties have to be the last thing in the body.
+        sb.append("""
+                    <w:sectPr>
+                      <w:pgSz w:w="%d" w:h="%d"/>
+                      <w:pgMar w:top="%d" w:right="%d" w:bottom="%d" w:left="%d"
+                               w:header="708" w:footer="708" w:gutter="0"/>
+                    </w:sectPr>
+                  </w:body>
+                </w:document>""".formatted(PAGE_WIDTH_TWIPS, PAGE_HEIGHT_TWIPS,
+                MARGIN_TWIPS, MARGIN_TWIPS, MARGIN_TWIPS, MARGIN_TWIPS));
+        return sb.toString();
+    }
 
+    /** The document's content, which needs the list of photos to number them. */
+    private static void drawBody(ReportDocument document, StringBuilder sb) {
         if (!document.title().isBlank()) {
             sb.append(paragraph("Title", List.of(new ReportDocument.Run(document.title(), false))));
         }
@@ -149,6 +215,7 @@ public final class WordDocument {
                     List.of(new ReportDocument.Run(document.subtitle(), false))));
         }
 
+        int imageIndex = 0;
         for (ReportDocument.Block block : document.blocks()) {
             if (block instanceof ReportDocument.Heading heading) {
                 sb.append(paragraph("Heading" + Math.min(3, Math.max(1, heading.level())),
@@ -162,19 +229,67 @@ public final class WordDocument {
                 }
             } else if (block instanceof ReportDocument.Table table) {
                 sb.append(table(table));
+            } else if (block instanceof ReportDocument.ImageBlock image && image.isUsable()) {
+                sb.append(picture(image, imageIndex));
+                imageIndex++;
             }
         }
+    }
 
-        // The section properties have to be the last thing in the body.
-        sb.append("""
-                    <w:sectPr>
-                      <w:pgSz w:w="%d" w:h="%d"/>
-                      <w:pgMar w:top="%d" w:right="%d" w:bottom="%d" w:left="%d"
-                               w:header="708" w:footer="708" w:gutter="0"/>
-                    </w:sectPr>
-                  </w:body>
-                </w:document>""".formatted(PAGE_WIDTH_TWIPS, PAGE_HEIGHT_TWIPS,
-                MARGIN_TWIPS, MARGIN_TWIPS, MARGIN_TWIPS, MARGIN_TWIPS));
+    /**
+     * A photo, as a drawing.
+     *
+     * <p>A picture in a Word file is not a reference to a file on disk: it is an
+     * image part inside the package, tied to the document by a relationship id, and
+     * placed by a DrawingML block that states its size twice - once as the shape's
+     * extent and once inside the shape's transform. Word needs both.
+     */
+    private static String picture(ReportDocument.ImageBlock image, int index) {
+        int[] pixels = ReportPhotos.pixelSize(image.data());
+        // Print at 70mm wide, which fits two to a line on A4 with the margins in use,
+        // and keep the picture's own shape. A picture whose size cannot be read is
+        // taken as square rather than being dropped.
+        long widthEmu = 70L * EMU_PER_MM;
+        long heightEmu = pixels[0] > 0 && pixels[1] > 0
+                ? Math.round(widthEmu * (pixels[1] / (double) pixels[0]))
+                : widthEmu;
+        String name = "KinderJournal photo " + (index + 1);
+        long drawingId = index + 1L;
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("<w:p><w:pPr><w:spacing w:before=\"60\" w:after=\"20\"/></w:pPr><w:r><w:drawing>")
+                .append("<wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\">")
+                .append("<wp:extent cx=\"").append(widthEmu).append("\" cy=\"")
+                .append(heightEmu).append("\"/>")
+                .append("<wp:effectExtent l=\"0\" t=\"0\" r=\"0\" b=\"0\"/>")
+                .append("<wp:docPr id=\"").append(drawingId).append("\" name=\"")
+                .append(OoxmlPackage.escape(name)).append("\"/>")
+                .append("<wp:cNvGraphicFramePr>")
+                .append("<a:graphicFrameLocks xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" noChangeAspect=\"1\"/>")
+                .append("</wp:cNvGraphicFramePr>")
+                .append("<a:graphic xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\">")
+                .append("<a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/picture\">")
+                .append("<pic:pic xmlns:pic=\"http://schemas.openxmlformats.org/drawingml/2006/picture\">")
+                .append("<pic:nvPicPr>")
+                .append("<pic:cNvPr id=\"").append(drawingId).append("\" name=\"")
+                .append(OoxmlPackage.escape(name)).append("\"/>")
+                .append("<pic:cNvPicPr><a:picLocks noChangeAspect=\"1\"/></pic:cNvPicPr>")
+                .append("</pic:nvPicPr>")
+                .append("<pic:blipFill>")
+                .append("<a:blip r:embed=\"").append("rId").append(index + 2).append("\"/>")
+                .append("<a:stretch><a:fillRect/></a:stretch>")
+                .append("</pic:blipFill>")
+                .append("<pic:spPr>")
+                .append("<a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"").append(widthEmu)
+                .append("\" cy=\"").append(heightEmu).append("\"/></a:xfrm>")
+                .append("<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom>")
+                .append("</pic:spPr>")
+                .append("</pic:pic></a:graphicData></a:graphic>")
+                .append("</wp:inline></w:drawing></w:r></w:p>");
+
+        if (!image.caption().isBlank()) {
+            sb.append(paragraph("Caption", List.of(new ReportDocument.Run(image.caption(), false))));
+        }
         return sb.toString();
     }
 
